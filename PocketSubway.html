@@ -117,36 +117,143 @@
     <script type="module">
         import * as THREE from 'three';
 
+        // --- Perlin Noise für prozedurale Texturen ---
+        // Implementierung von SimplexNoise (ähnlich Perlin, aber etwas besser)
+        // Quelle: https://github.com/mrdoob/three.js/blob/master/examples/jsm/math/SimplexNoise.js
+        class SimplexNoise {
+            constructor(r = Math) {
+                this.grad3 = [
+                    [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
+                    [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
+                    [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1]
+                ];
+                this.p = [];
+                for (let i = 0; i < 256; i++) {
+                    this.p[i] = Math.floor(r.random() * 256);
+                }
+                // To remove the need for modulos, extend the permutation table to 512
+                this.perm = [];
+                for (let i = 0; i < 512; i++) {
+                    this.perm[i] = this.p[i & 255];
+                }
+            }
+
+            dot(g, x, y) {
+                return g[0] * x + g[1] * y;
+            }
+
+            noise2D(xin, yin) {
+                const F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
+                const G2 = (3.0 - Math.sqrt(3.0)) / 6.0;
+                let n0, n1, n2;
+                const s = (xin + yin) * F2;
+                const i = Math.floor(xin + s);
+                const j = Math.floor(yin + s);
+                const t = (i + j) * G2;
+                const X0 = i - t;
+                const Y0 = j - t;
+                const x0 = xin - X0;
+                const y0 = yin - Y0;
+                let i1, j1;
+                if (x0 > y0) {
+                    i1 = 1;
+                    j1 = 0;
+                } else {
+                    i1 = 0;
+                    j1 = 1;
+                }
+                const x1 = x0 - i1 + G2;
+                const y1 = y0 - j1 + G2;
+                const x2 = x0 - 1.0 + 2.0 * G2;
+                const y2 = y0 - 1.0 + 2.0 * G2;
+                const ii = i & 255;
+                const jj = j & 255;
+                let t0 = 0.5 - x0 * x0 - y0 * y0;
+                if (t0 < 0) {
+                    n0 = 0.0;
+                } else {
+                    t0 *= t0;
+                    n0 = t0 * t0 * this.dot(this.grad3[this.perm[ii + this.perm[jj]] % 12], x0, y0);
+                }
+                let t1 = 0.5 - x1 * x1 - y1 * y1;
+                if (t1 < 0) {
+                    n1 = 0.0;
+                } else {
+                    t1 *= t1;
+                    n1 = t1 * t1 * this.dot(this.grad3[this.perm[ii + i1 + this.perm[jj + j1]] % 12], x1, y1);
+                }
+                let t2 = 0.5 - x2 * x2 - y2 * y2;
+                if (t2 < 0) {
+                    n2 = 0.0;
+                } else {
+                    t2 *= t2;
+                    n2 = t2 * t2 * this.dot(this.grad3[this.perm[ii + 1 + this.perm[jj + 1]] % 12], x2, y2);
+                }
+                return 70.0 * (n0 + n1 + n2);
+            }
+        }
+        
+        const simplex = new SimplexNoise();
+
+        function generateNoiseTexture(width, height, scale, color1, color2) {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+
+            const c1 = new THREE.Color(color1);
+            const c2 = new THREE.Color(color2);
+
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    const value = (simplex.noise2D(x / scale, y / scale) + 1) / 2; // Normalize to 0-1
+                    
+                    const interpolatedColor = new THREE.Color().lerpColors(c1, c2, value);
+
+                    const i = (y * width + x) * 4;
+                    data[i] = Math.floor(interpolatedColor.r * 255);
+                    data[i + 1] = Math.floor(interpolatedColor.g * 255);
+                    data[i + 2] = Math.floor(interpolatedColor.b * 255);
+                    data[i + 3] = 255; // Alpha
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+            return new THREE.CanvasTexture(canvas);
+        }
+
         // --- Globale Variablen ---
         let scene, camera, renderer, clock;
-        let driverCab; // Gruppe für das Cockpit
-        let trackCurve; // Die Hauptkurve der Strecke
+        let driverCab; 
+        let trackCurve; // Diese Kurve ist die Basis (y=0) auf Schwellenhöhe
         let totalTrackLength = 0;
-        let playerDistance = 0; // Distanz des Spielers auf der Strecke
-        let playerSpeed = 0; // in m/s
+        let playerDistance = 0; 
+        let playerSpeed = 0; 
 
         // Steuerungs- und Physikvariablen
-        let throttle = 0; // 0-1
-        let brake = 0; // 0-1
+        let throttle = 0; 
+        let brake = 0; 
         let doorsOpen = false;
         let atStation = false;
         let currentStation = null;
 
-        const MASS = 50000; // Masse der U-Bahn in kg
-        const MAX_THROTTLE_FORCE = 80000; // Newton
-        const MAX_BRAKE_FORCE = 200000; // Newton
-        const FRICTION_COEFFICIENT = 150; // Rollwiderstand
+        const MASS = 50000; 
+        const MAX_THROTTLE_FORCE = 80000; 
+        const MAX_BRAKE_FORCE = 200000; 
+        const FRICTION_COEFFICIENT = 150; 
         const GRAVITY = 9.81;
-        const MAX_SPEED = 25; // m/s (ca. 90 km/h)
+        const MAX_SPEED = 25; 
 
         // Strecken-Generierung
         const stations = [];
-        const NUM_SEGMENTS = 50; // Anzahl der Streckenabschnitte
-        const MIN_SEGMENT_LENGTH = 300; // Meter
-        const MAX_SEGMENT_LENGTH = 1000; // Meter
-        const STATION_LENGTH = 200; // Meter
-        const MAX_CURVATURE = 0.001; // Bogenmaß pro Meter
-        const MAX_INCLINE = 0.0005; // Höhenänderung pro Meter
+        const NUM_SEGMENTS = 50; 
+        const MIN_SEGMENT_LENGTH = 300; 
+        const MAX_SEGMENT_LENGTH = 1000; 
+        const STATION_LENGTH = 200; 
+        const MAX_CURVATURE = 0.001; 
+        const MAX_INCLINE = 0.0005; 
+        const TUBE_SEGMENTS = 1500; // Feste, vernünftige Segmentzahl
 
         // DOM-Elemente
         const ui = {
@@ -164,31 +271,46 @@
             statusMessage: document.getElementById('status-message'),
         };
 
+        // Materialien für prozedurale Texturen (generiert bei Init)
+        let tunnelMaterial, railMaterial, tieMaterial;
+        let stationWallMaterial, stationFloorMaterial, stationCeilingMaterial;
+        
         // --- Initialisierung ---
         function init() {
             // Szene
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x202020);
-            scene.fog = new THREE.Fog(0x202020, 50, 400);
+            scene.fog = new THREE.Fog(0x202020, 50, 400); // Nebel wieder aktivieren
 
             // Uhr
             clock = new THREE.Clock();
 
             // Kamera (First-Person)
             camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 1.0, 0); 
+            // Kameraposition wird jetzt dynamisch in updateCameraPosition gesetzt
             
             // Renderer
             const container = document.getElementById('canvas-container');
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = false; 
             container.appendChild(renderer.domElement);
 
+            // --- Beleuchtung für MeshStandardMaterial ---
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); 
+            scene.add(ambientLight);
+            
+            const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8); 
+            scene.add(hemisphereLight);
+            
             // Cockpit erstellen
             createDriverCab();
-            camera.add(driverCab); // Cockpit an Kamera heften
+            camera.add(driverCab); 
             scene.add(camera);
+
+            // Prozedurale Materialien generieren
+            createProceduralMaterials();
             
             // Event-Listener
             window.addEventListener('resize', onWindowResize);
@@ -203,11 +325,64 @@
             }, 50);
         }
 
+        // --- Prozedurale Materialerzeugung ---
+        function createProceduralMaterials() {
+            // Tunnel Material
+            tunnelMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4d382d, // Eine Grundfarbe, die gut mit dem Farbverlauf harmoniert
+                side: THREE.BackSide, 
+                roughness: 0.8,
+                metalness: 0.1
+            });
+
+            // Schienen Material
+            railMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x666666, 
+                roughness: 0.7, 
+                metalness: 0.9 
+            }); 
+            
+            // Schwellen Material
+            tieMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4a2a0a, 
+                roughness: 0.9 
+            }); 
+
+            // Bahnhof Materialien
+            const stationWallTexture = generateNoiseTexture(512, 128, 12, 0xaaaaaa, 0x888888); 
+            stationWallTexture.wrapS = THREE.RepeatWrapping;
+            stationWallTexture.wrapT = THREE.RepeatWrapping;
+            stationWallMaterial = new THREE.MeshStandardMaterial({ 
+                map: stationWallTexture,
+                roughness: 0.7,
+                metalness: 0.1
+            });
+            
+            const stationFloorTexture = generateNoiseTexture(256, 256, 50, 0xcccccc, 0x999999); 
+            stationFloorTexture.wrapS = THREE.RepeatWrapping;
+            stationFloorTexture.wrapT = THREE.RepeatWrapping;
+            stationFloorMaterial = new THREE.MeshStandardMaterial({ 
+                map: stationFloorTexture,
+                roughness: 0.6,
+                metalness: 0.05
+            });
+
+            const stationCeilingTexture = generateNoiseTexture(256, 256, 10, 0xdddddd, 0xbbbbbb); 
+            stationCeilingTexture.wrapS = THREE.RepeatWrapping;
+            stationCeilingTexture.wrapT = THREE.RepeatWrapping;
+            stationCeilingMaterial = new THREE.MeshStandardMaterial({ 
+                map: stationCeilingTexture,
+                roughness: 0.5,
+                metalness: 0.0
+            });
+        }
+
+
         // --- Strecken-Generierung ---
         function buildProceduralTrack() {
             const points = [];
-            let currentPos = new THREE.Vector3(0, 0, 0);
-            let currentDir = new THREE.Vector3(0, 0, -1); // Startrichtung Z-
+            let currentPos = new THREE.Vector3(0, 0, 0); // y=0 ist jetzt die Schwellen-Oberkante
+            let currentDir = new THREE.Vector3(0, 0, -1); 
             
             let currentCurvature = 0;
             let currentIncline = 0;
@@ -227,8 +402,8 @@
 
                 if (isStation) {
                     segmentLength = STATION_LENGTH;
-                    targetCurvature = 0; // Bahnhöfe sind gerade
-                    targetIncline = 0;   // Bahnhöfe sind flach
+                    targetCurvature = 0; 
+                    targetIncline = 0;   
                     stations.push({
                         name: `Haltestelle ${String.fromCharCode(65 + stations.length)}`,
                         distance: totalTrackLength + segmentLength / 2,
@@ -242,18 +417,14 @@
                     lastWasStation = false;
                 }
 
-                // Punkte für dieses Segment generieren (1 Punkt pro Meter)
                 for (let m = 0; m < segmentLength; m++) {
-                    // Sanfter Übergang zu neuer Krümmung/Steigung
                     currentCurvature += (targetCurvature - currentCurvature) * 0.05;
                     currentIncline += (targetIncline - currentIncline) * 0.05;
 
-                    // Drehung für Kurve (um Y-Achse)
                     tempQuat.setFromAxisAngle(up, currentCurvature);
                     currentDir.applyQuaternion(tempQuat);
 
-                    // Drehung für Steigung (um lokale X-Achse)
-                    tempVec.crossVectors(currentDir, up).normalize(); // Lokale X-Achse (rechts)
+                    tempVec.crossVectors(currentDir, up).normalize(); 
                     tempQuat.setFromAxisAngle(tempVec, currentIncline);
                     currentDir.applyQuaternion(tempQuat);
                     
@@ -268,65 +439,74 @@
             trackCurve.tension = 0.5;
 
             // Geometrie für die Strecke erstellen
-            createTrackGeometry(trackCurve, points.length);
+            createTrackGeometry(trackCurve);
             
             // Bahnhöfe erstellen
             createStations(trackCurve);
         }
 
         // --- Strecken-Geometrie ---
-        function createTrackGeometry(curve, numPoints) {
+        function createTrackGeometry(curve) {
             
+            // --- KORREKTUR: Tunnel wird auf einer separaten, angehobenen Kurve gebaut ---
+            const tunnelPoints = [];
+            const railPointsLeft = [];
+            const railPointsRight = [];
+            
+            const tunnelOffsetY = 4.5; // Zentrum der Tunnelröhre (y=4.5)
+            const tunnelRadius = 5.0; // Radius der Röhre (Boden bei 4.5 - 5 = -0.5)
+            const railOffset = 1.0; 
+            const railHeight = 0.1; // Schienenoberkante 0.1m über Schwellen (y=0)
+            
+            const up = new THREE.Vector3(0, 1, 0);
+            const tangent = new THREE.Vector3();
+            const binormal = new THREE.Vector3();
+            const normal = new THREE.Vector3();
+            const pos = new THREE.Vector3();
+
+            const numRailPoints = Math.floor(totalTrackLength); 
+            
+            for (let i = 0; i < numRailPoints; i++) {
+                const t = i / numRailPoints;
+                curve.getPointAt(t, pos);
+                curve.getTangentAt(t, tangent);
+                
+                // Berechne lokale Achsen
+                binormal.crossVectors(up, tangent).normalize(); 
+                normal.crossVectors(tangent, binormal).normalize(); // Das "Oben" der Strecke
+                
+                // 1. Schienenpositionen (relativ zu y=0)
+                const posLeft = pos.clone().add(binormal.clone().multiplyScalar(railOffset)).add(normal.clone().multiplyScalar(railHeight));
+                const posRight = pos.clone().add(binormal.clone().multiplyScalar(-railOffset)).add(normal.clone().multiplyScalar(railHeight));
+                railPointsLeft.push(posLeft);
+                railPointsRight.push(posRight);
+
+                // 2. Tunnel-Mittelpunkt-Position (angehoben)
+                const tunnelCenterPos = pos.clone().add(normal.clone().multiplyScalar(tunnelOffsetY));
+                tunnelPoints.push(tunnelCenterPos);
+            }
+
             // 1. Der Tunnel
-            const tunnelGeometry = new THREE.TubeGeometry(curve, numPoints, 5, 8, false);
-            const tunnelMaterial = new THREE.MeshBasicMaterial({ 
-                color: 0x8B4513, // Hellbraun (SaddleBrown)
-                side: THREE.BackSide, 
-            });
+            const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
+            const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 8, false);
             const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
             scene.add(tunnelMesh);
 
             // 2. Schienen
-            const railPointsLeft = [];
-            const railPointsRight = [];
-            const railOffset = 1.0; 
-            const railHeight = -4.5; 
-            
-            const up = new THREE.Vector3(0, 1, 0);
-            const binormal = new THREE.Vector3();
-            const tangent = new THREE.Vector3();
-            const pos = new THREE.Vector3();
-
-            for (let i = 0; i < numPoints; i++) {
-                const t = i / numPoints;
-                curve.getPointAt(t, pos);
-                curve.getTangentAt(t, tangent);
-                
-                binormal.crossVectors(up, tangent).normalize(); 
-                
-                const posLeft = pos.clone().add(binormal.clone().multiplyScalar(railOffset)).add(up.clone().multiplyScalar(railHeight));
-                const posRight = pos.clone().add(binormal.clone().multiplyScalar(-railOffset)).add(up.clone().multiplyScalar(railHeight));
-                
-                railPointsLeft.push(posLeft);
-                railPointsRight.push(posRight);
-            }
-
             const railCurveLeft = new THREE.CatmullRomCurve3(railPointsLeft);
             const railCurveRight = new THREE.CatmullRomCurve3(railPointsRight);
 
-            const railGeo = new THREE.TubeGeometry(railCurveLeft, numPoints, 0.1, 4, false);
-            const railMat = new THREE.MeshBasicMaterial({ color: 0x888888 }); 
-            const railMeshLeft = new THREE.Mesh(railGeo, railMat);
-            const railMeshRight = new THREE.Mesh(railGeo.clone().copy(new THREE.TubeGeometry(railCurveRight, numPoints, 0.1, 4, false)), railMat);
+            const railGeo = new THREE.TubeGeometry(railCurveLeft, TUBE_SEGMENTS, 0.1, 4, false);
+            const railMeshLeft = new THREE.Mesh(railGeo, railMaterial);
+            const railMeshRight = new THREE.Mesh(railGeo.clone().copy(new THREE.TubeGeometry(railCurveRight, TUBE_SEGMENTS, 0.1, 4, false)), railMaterial);
             
             scene.add(railMeshLeft);
             scene.add(railMeshRight);
 
             // 3. Schwellen
             const tieGeo = new THREE.BoxGeometry(2.5, 0.15, 0.3);
-            const tieMat = new THREE.MeshBasicMaterial({ color: 0x4a2a0a }); 
             const tieCount = Math.floor(totalTrackLength / 1.5); 
-            const tieMesh = new THREE.InstancedMesh(tieGeo, tieMat, tieCount);
+            const tieMesh = new THREE.InstancedMesh(tieGeo, tieMaterial, tieCount);
             
             const dummy = new THREE.Object3D();
             const lookAtPos = new THREE.Vector3();
@@ -338,7 +518,9 @@
                 curve.getPointAt(t, dummy.position);
                 curve.getPointAt(t_next, lookAtPos);
                 
-                dummy.position.y += railHeight - 0.1; 
+                // Schwellen sind bei y=0 zentriert (halbe Dicke nach unten)
+                dummy.position.y -= 0.075; 
+                
                 dummy.lookAt(lookAtPos);
                 
                 dummy.updateMatrix();
@@ -350,10 +532,11 @@
 
         // --- Bahnhöfe ---
         function createStations(curve) {
-            const platformGeo = new THREE.BoxGeometry(STATION_LENGTH, 1, 4);
-            const platformMat = new THREE.MeshBasicMaterial({ color: 0xbbbbbb }); 
-            const platformHeight = -3.5;
-            const platformOffset = 4; 
+            // Bahnsteighöhe auf 1.0m (über y=0)
+            const platformHeight = 1.0;
+            const platformOffset = 4; // Abstand von der Mitte der Strecke
+            const stationRoofHeight = 2.5; // Höhe des Bahnhofsdachs über der Plattform
+            const stationWallHeight = 3.0; // Höhe der Stationswände
 
             const up = new THREE.Vector3(0, 1, 0);
             const binormal = new THREE.Vector3();
@@ -366,19 +549,83 @@
                 curve.getTangentAt(t, tangent);
                 binormal.crossVectors(up, tangent).normalize();
                 
-                // Plattform links
-                const platformLeft = new THREE.Mesh(platformGeo, platformMat);
-                const posLeft = pos.clone().add(binormal.clone().multiplyScalar(platformOffset)).add(up.clone().multiplyScalar(platformHeight));
-                platformLeft.position.copy(posLeft);
-                platformLeft.lookAt(pos.clone().add(tangent).add(binormal.clone().multiplyScalar(platformOffset)));
-                scene.add(platformLeft);
+                // Bahnhof als Gruppe erstellen
+                const stationGroup = new THREE.Group();
+                stationGroup.position.copy(pos);
+                stationGroup.lookAt(pos.clone().add(tangent)); // Bahnhof entlang der Strecke ausrichten
+                scene.add(stationGroup);
+
+                // 1. Plattform
+                const platformGeo = new THREE.BoxGeometry(station.length, 0.5, 3.5); 
+                const platformMeshLeft = new THREE.Mesh(platformGeo, stationFloorMaterial);
+                // Plattform-Y-Position angepasst
+                platformMeshLeft.position.set(platformOffset, platformHeight - 0.25, 0); // Zentrum der Plattform
+                stationGroup.add(platformMeshLeft);
+
+                const platformMeshRight = new THREE.Mesh(platformGeo, stationFloorMaterial);
+                // Plattform-Y-Position angepasst
+                platformMeshRight.position.set(-platformOffset, platformHeight - 0.25, 0); // Zentrum der Plattform
+                stationGroup.add(platformMeshRight);
+
+                // 2. Wände (außen zur Tunnelwand)
+                const wallGeo = new THREE.BoxGeometry(0.5, stationWallHeight, station.length); 
+                const wallMeshLeft = new THREE.Mesh(wallGeo, stationWallMaterial);
+                // Wand-Y-Position angepasst
+                wallMeshLeft.position.set(platformOffset + 1.75, platformHeight + (stationWallHeight / 2) - 0.5, 0); 
+                stationGroup.add(wallMeshLeft);
+
+                const wallMeshRight = new THREE.Mesh(wallGeo, stationWallMaterial);
+                // Wand-Y-Position angepasst
+                wallMeshRight.position.set(-platformOffset - 1.75, platformHeight + (stationWallHeight / 2) - 0.5, 0); 
+                stationGroup.add(wallMeshRight);
+
+                // 3. Decke
+                const ceilingGeo = new THREE.BoxGeometry(2 * (platformOffset + 2), 0.2, station.length);
+                const ceilingMesh = new THREE.Mesh(ceilingGeo, stationCeilingMaterial);
+                // Decken-Y-Position angepasst
+                ceilingMesh.position.set(0, platformHeight + stationWallHeight + stationRoofHeight / 2, 0); 
+                stationGroup.add(ceilingMesh);
+
+                // 4. Bahnhofsname (TextMesh) - vereinfacht als Plane für Text
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.font = 'Bold 60px Arial';
+                ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
+                ctx.fillText(station.name.toUpperCase(), canvas.width / 2, canvas.height / 2 + 20);
+                const textTexture = new THREE.CanvasTexture(canvas);
+                const textMaterial = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true });
+                const textPlane = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.5), textMaterial); 
+                // Text-Y-Position angepasst
+                textPlane.position.set(platformOffset + 1.6, platformHeight + 1.5, 0); 
+                textPlane.rotation.y = Math.PI / 2; 
+                stationGroup.add(textPlane);
+
+                // 5. Bahnhofsbeleuchtung (zusätzliche PointLights im Bahnhof)
+                const stationLight1 = new THREE.PointLight(0xffffee, 1.5, 30, 2);
+                // Licht-Y-Position angepasst
+                stationLight1.position.set(platformOffset + 1.75, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, -station.length / 4);
+                stationLight1.isStationLight = true; 
+                stationGroup.add(stationLight1);
+
+                const stationLight2 = stationLight1.clone();
+                stationLight2.position.set(platformOffset + 1.75, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, station.length / 4);
+                stationLight2.isStationLight = true;
+                stationGroup.add(stationLight2);
                 
-                // Plattform rechts
-                const platformRight = new THREE.Mesh(platformGeo, platformMat);
-                const posRight = pos.clone().add(binormal.clone().multiplyScalar(-platformOffset)).add(up.clone().multiplyScalar(platformHeight));
-                platformRight.position.copy(posRight);
-                platformRight.lookAt(pos.clone().add(tangent).add(binormal.clone().multiplyScalar(-platformOffset)));
-                scene.add(platformRight);
+                const stationLight3 = stationLight1.clone();
+                stationLight3.position.set(-(platformOffset + 1.75), platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, -station.length / 4);
+                stationLight3.isStationLight = true;
+                stationGroup.add(stationLight3);
+
+                const stationLight4 = stationLight1.clone();
+                stationLight4.position.set(-(platformOffset + 1.75), platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, station.length / 4);
+                stationLight4.isStationLight = true;
+                stationGroup.add(stationLight4);
             });
         }
         
@@ -391,19 +638,12 @@
                 side: THREE.DoubleSide, 
             });
             
-            // KORREKTUR: Cockpit auf das absolute Minimum reduziert
-            // Nur noch ein kleines, niedriges Armaturenbrett
-            
-            // Geometrie: 4 breit, 0.2 hoch, 0.1 tief
             const dashGeo = new THREE.BoxGeometry(4, 0.2, 0.1);
             const dash = new THREE.Mesh(dashGeo, cabMat);
             
-            // Position: Niedrig (y=-0.8) und vor der Kamera (z=-2.5)
-            // Top edge will be at y = -0.7 relative to camera center
-            dash.position.set(0, -0.8, -2.5); 
+            // Y-Position relativ zur Kamera (die bei 2.5m über der Strecke ist)
+            dash.position.set(0, -1.8, -2.5); // Tiefer gesetzt, um unter der Sichtlinie zu bleiben
             driverCab.add(dash);
-
-            // Alle anderen Teile (Boden, Dach, Wände, Fenster) wurden entfernt
         }
 
         // --- Steuerung ---
@@ -496,29 +736,38 @@
         }
 
         // --- Kamera-Update ---
+        // Vektoren für Berechnungen wiederverwenden, um Müll zu vermeiden
+        const _camUp = new THREE.Vector3(0, 1, 0);
+        const _camTangent = new THREE.Vector3();
+        const _camBinormal = new THREE.Vector3();
+        const _camNormal = new THREE.Vector3();
+        const _camPos = new THREE.Vector3();
+        const _camLookAt = new THREE.Vector3();
+        
         function updateCameraPosition() {
             if (!trackCurve) return;
 
             const t = playerDistance / totalTrackLength;
             const t_lookat = (playerDistance + 15) / totalTrackLength; 
 
-            const camPos = trackCurve.getPointAt(t);
-            const camLookAt = trackCurve.getPointAt(t_lookat);
+            trackCurve.getPointAt(t, _camPos);
+            trackCurve.getPointAt(t_lookat, _camLookAt);
             
-            const wobbleX = Math.sin(Date.now() * 0.005 * playerSpeed) * 0.01;
-            const wobbleY = Math.cos(Date.now() * 0.004 * playerSpeed) * 0.01;
+            // KORREKTUR: Kamera folgt jetzt dem "Normalenvektor" (Oben) der Strecke
+            trackCurve.getTangentAt(t, _camTangent);
+            _camBinormal.crossVectors(_camUp, _camTangent).normalize();
+            _camNormal.crossVectors(_camTangent, _camBinormal).normalize();
+            
+            const cameraOffsetY = 2.5;
+            camera.position.copy(_camPos).add(_camNormal.multiplyScalar(cameraOffsetY));
+            
+            // KORREKTUR: Blickwinkel angehoben (weniger nach unten)
+            _camLookAt.y = camera.position.y - 0.5; // Schaut 0.5m unter die Augenhöhe
+            
+            // KORREKTUR: Fester "Up"-Vektor, um Neigen zu verhindern
+            camera.up.set(0, 1, 0);
 
-            camera.position.copy(camPos).add(new THREE.Vector3(wobbleX, 1.0 + wobbleY, 0));
-            
-            camLookAt.y -= 0.5; 
-            
-            const tangent = trackCurve.getTangentAt(t);
-            const up = new THREE.Vector3(0, 1, 0);
-            const binormal = new THREE.Vector3().crossVectors(up, tangent).normalize();
-            const normal = new THREE.Vector3().crossVectors(tangent, binormal).normalize();
-            camera.up.copy(normal);
-
-            camera.lookAt(camLookAt);
+            camera.lookAt(_camLookAt);
         }
 
         // --- Stations-Logik ---
