@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Prozeduraler U-Bahn Simulator</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- three.js -->
     <script type="importmap">
         {
             "imports": {
@@ -43,10 +41,8 @@
 </head>
 <body class="text-white">
 
-    <!-- 3D-Canvas-Container -->
     <div id="canvas-container"></div>
 
-    <!-- Ladebildschirm -->
     <div id="loading-screen" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
         <div class="text-center">
             <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
@@ -55,19 +51,15 @@
         </div>
     </div>
 
-    <!-- UI-Overlay -->
     <div id="ui-container" class="fixed inset-0 pointer-events-none p-4 md:p-8 flex flex-col justify-between hidden">
         
-        <!-- Obere Info-Anzeige -->
         <div class="w-full flex justify-between items-start text-lg">
-            <!-- Status-Anzeige -->
             <div class="bg-black bg-opacity-50 p-3 rounded-lg shadow-lg">
                 <h2 class="text-sm font-semibold text-gray-400">NÄCHSTE HALTESTELLE</h2>
                 <p id="next-station-name" class="text-2xl font-bold">Hauptbahnhof</p>
                 <p id="next-station-distance" class="text-xl font-mono">1500 m</p>
             </div>
             
-            <!-- Geschwindigkeitsanzeige -->
             <div class="bg-black bg-opacity-50 p-3 rounded-lg shadow-lg text-right">
                 <h2 class="text-sm font-semibold text-gray-400">GESCHWINDIGKEIT</h2>
                 <p id="speed-display" class="text-4xl font-bold font-mono">0</p>
@@ -75,18 +67,14 @@
             </div>
         </div>
 
-        <!-- Untere Steuerung -->
         <div class="w-full flex justify-between items-end pointer-events-auto">
             
-            <!-- Linke Steuerung (Schub & Bremse) -->
             <div class="flex space-x-8 bg-black bg-opacity-50 p-4 rounded-lg shadow-lg">
-                <!-- Schub -->
                 <div class="flex flex-col items-center">
                     <label for="throttle" class="text-sm font-semibold text-green-400">SCHUB</label>
                     <input type="range" id="throttle" orient="vertical" min="0" max="100" value="0" class="mt-2 h-36 md:h-48 accent-green-500">
                     <span id="throttle-value" class="font-mono text-lg mt-2">0%</span>
                 </div>
-                <!-- Bremse -->
                 <div class="flex flex-col items-center">
                     <label for="brake" class="text-sm font-semibold text-red-400">BREMSE</label>
                     <input type="range" id="brake" orient="vertical" min="0" max="100" value="0" class="mt-2 h-36 md:h-48 accent-red-500">
@@ -94,14 +82,11 @@
                 </div>
             </div>
 
-            <!-- Rechte Steuerung (Türen & Status) -->
             <div class="flex flex-col items-end space-y-4">
-                <!-- Statusmeldung -->
                 <div id="status-message" class="bg-blue-600 bg-opacity-80 p-3 rounded-lg shadow-lg text-lg font-semibold text-center hidden">
                     An Haltestelle angehalten.
                 </div>
 
-                <!-- Türsteuerung -->
                 <button id="door-button" classs="w-full" disabled>
                     <div class="bg-gray-700 p-4 rounded-lg shadow-lg text-xl font-bold transition-all duration-200 cursor-not-allowed opacity-50 flex items-center justify-center space-x-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -287,7 +272,6 @@
 
             // Kamera (First-Person)
             camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
-            // Kameraposition wird jetzt dynamisch in updateCameraPosition gesetzt
             
             // Renderer
             const container = document.getElementById('canvas-container');
@@ -298,8 +282,12 @@
             container.appendChild(renderer.domElement);
 
             // --- Beleuchtung für MeshStandardMaterial ---
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); 
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); 
             scene.add(ambientLight);
+            
+            const pointLight = new THREE.PointLight(0xffffff, 0.5, 50, 2);
+            pointLight.position.set(0, 3, -10);
+            scene.add(pointLight);
             
             const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8); 
             scene.add(hemisphereLight);
@@ -329,7 +317,7 @@
         function createProceduralMaterials() {
             // Tunnel Material
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x4d382d, // Eine Grundfarbe, die gut mit dem Farbverlauf harmoniert
+                color: 0x3a2e26, // Dunklerer Braunton
                 side: THREE.BackSide, 
                 roughness: 0.8,
                 metalness: 0.1
@@ -392,14 +380,60 @@
             const tempVec = new THREE.Vector3();
             const tempQuat = new THREE.Quaternion();
 
-            let lastWasStation = false;
+            // --- 1. Feste 50m-Strecke bis zur ersten Station ---
+            let segmentLength = 50;
+            let targetCurvature = 0; // Geradeaus
+            let targetIncline = 0;   // Flach
+            
+            for (let m = 0; m < segmentLength; m++) {
+                currentCurvature += (targetCurvature - currentCurvature) * 0.05;
+                currentIncline += (targetIncline - currentIncline) * 0.05;
+                
+                tempQuat.setFromAxisAngle(up, currentCurvature);
+                currentDir.applyQuaternion(tempQuat);
+                
+                tempVec.crossVectors(currentDir, up).normalize(); 
+                tempQuat.setFromAxisAngle(tempVec, currentIncline);
+                currentDir.applyQuaternion(tempQuat);
+                
+                currentPos.add(currentDir);
+                points.push(currentPos.clone());
+                totalTrackLength++;
+            }
 
-            for (let i = 0; i < NUM_SEGMENTS; i++) {
-                const isStation = Math.random() < 0.2 && !lastWasStation && i > 0;
-                let segmentLength;
-                let targetCurvature;
-                let targetIncline;
+            // --- 2. Erste Station (200m) erzwingen ---
+            segmentLength = STATION_LENGTH; // 200m
+            targetCurvature = 0; // Station ist gerade
+            targetIncline = 0;   // Station ist flach
+            
+            stations.push({
+                name: `Haltestelle ${String.fromCharCode(65 + stations.length)}`,
+                distance: totalTrackLength + segmentLength / 2, // Center will be at 50 + 100 = 150m
+                length: segmentLength
+            });
 
+            for (let m = 0; m < segmentLength; m++) {
+                currentCurvature += (targetCurvature - currentCurvature) * 0.05;
+                currentIncline += (targetIncline - currentIncline) * 0.05;
+
+                tempQuat.setFromAxisAngle(up, currentCurvature);
+                currentDir.applyQuaternion(tempQuat);
+                
+                tempVec.crossVectors(currentDir, up).normalize(); 
+                tempQuat.setFromAxisAngle(tempVec, currentIncline);
+                currentDir.applyQuaternion(tempQuat);
+                
+                currentPos.add(currentDir);
+                points.push(currentPos.clone());
+                totalTrackLength++;
+            }
+            
+            let lastWasStation = true; // Wichtig für den nächsten Schleifendurchlauf
+
+            // --- 3. Restliche Strecke prozedural generieren ---
+            for (let i = 1; i < NUM_SEGMENTS; i++) { // Start at i=1
+                const isStation = Math.random() < 0.2 && !lastWasStation; 
+                
                 if (isStation) {
                     segmentLength = STATION_LENGTH;
                     targetCurvature = 0; 
@@ -417,14 +451,18 @@
                     lastWasStation = false;
                 }
 
+                // Punkte für dieses Segment generieren (1 Punkt pro Meter)
                 for (let m = 0; m < segmentLength; m++) {
+                    // Sanfter Übergang zu neuer Krümmung/Steigung
                     currentCurvature += (targetCurvature - currentCurvature) * 0.05;
                     currentIncline += (targetIncline - currentIncline) * 0.05;
 
+                    // Drehung für Kurve (um Y-Achse)
                     tempQuat.setFromAxisAngle(up, currentCurvature);
                     currentDir.applyQuaternion(tempQuat);
 
-                    tempVec.crossVectors(currentDir, up).normalize(); 
+                    // Drehung für Steigung (um lokale X-Achse)
+                    tempVec.crossVectors(currentDir, up).normalize(); // Lokale X-Achse (rechts)
                     tempQuat.setFromAxisAngle(tempVec, currentIncline);
                     currentDir.applyQuaternion(tempQuat);
                     
@@ -433,6 +471,7 @@
                     totalTrackLength++;
                 }
             }
+
 
             trackCurve = new THREE.CatmullRomCurve3(points);
             trackCurve.curveType = 'catmullrom';
@@ -448,13 +487,12 @@
         // --- Strecken-Geometrie ---
         function createTrackGeometry(curve) {
             
-            // --- KORREKTUR: Tunnel wird auf einer separaten, angehobenen Kurve gebaut ---
             const tunnelPoints = [];
             const railPointsLeft = [];
             const railPointsRight = [];
             
-            const tunnelOffsetY = 4.5; // Zentrum der Tunnelröhre (y=4.5)
-            const tunnelRadius = 5.0; // Radius der Röhre (Boden bei 4.5 - 5 = -0.5)
+            const tunnelOffsetY = 4.5; // Zentrum der Tunnelröhre (y=4.5 über Schwellenhöhe)
+            const tunnelRadius = 5.0; // Radius der Röhre (Boden bei 4.5 - 5 = -0.5m unter Schwellenhöhe)
             const railOffset = 1.0; 
             const railHeight = 0.1; // Schienenoberkante 0.1m über Schwellen (y=0)
             
@@ -532,9 +570,10 @@
 
         // --- Bahnhöfe ---
         function createStations(curve) {
-            // Bahnsteighöhe auf 1.0m (über y=0)
-            const platformHeight = 1.0;
-            const platformOffset = 4; // Abstand von der Mitte der Strecke
+            // Bahnsteighöhe auf 0.5m (über y=0)
+            const platformHeight = 0.5;
+            // Bahnsteig-Offset auf 3 (statt 4)
+            const platformOffset = 3.0; // Abstand von der Mitte der Strecke
             const stationRoofHeight = 2.5; // Höhe des Bahnhofsdachs über der Plattform
             const stationWallHeight = 3.0; // Höhe der Stationswände
 
@@ -556,7 +595,8 @@
                 scene.add(stationGroup);
 
                 // 1. Plattform
-                const platformGeo = new THREE.BoxGeometry(station.length, 0.5, 3.5); 
+                // KORREKTUR: BoxGeometry(Breite, Höhe, LÄNGE)
+                const platformGeo = new THREE.BoxGeometry(3.5, 0.5, station.length); 
                 const platformMeshLeft = new THREE.Mesh(platformGeo, stationFloorMaterial);
                 // Plattform-Y-Position angepasst
                 platformMeshLeft.position.set(platformOffset, platformHeight - 0.25, 0); // Zentrum der Plattform
@@ -571,19 +611,19 @@
                 const wallGeo = new THREE.BoxGeometry(0.5, stationWallHeight, station.length); 
                 const wallMeshLeft = new THREE.Mesh(wallGeo, stationWallMaterial);
                 // Wand-Y-Position angepasst
-                wallMeshLeft.position.set(platformOffset + 1.75, platformHeight + (stationWallHeight / 2) - 0.5, 0); 
+                wallMeshLeft.position.set(platformOffset + 1.75 + 0.25, platformHeight + (stationWallHeight / 2) - 0.5, 0); // Leicht nach außen verschoben
                 stationGroup.add(wallMeshLeft);
 
                 const wallMeshRight = new THREE.Mesh(wallGeo, stationWallMaterial);
                 // Wand-Y-Position angepasst
-                wallMeshRight.position.set(-platformOffset - 1.75, platformHeight + (stationWallHeight / 2) - 0.5, 0); 
+                wallMeshRight.position.set(-(platformOffset + 1.75 + 0.25), platformHeight + (stationWallHeight / 2) - 0.5, 0); // Leicht nach außen verschoben
                 stationGroup.add(wallMeshRight);
 
                 // 3. Decke
-                const ceilingGeo = new THREE.BoxGeometry(2 * (platformOffset + 2), 0.2, station.length);
+                const ceilingGeo = new THREE.BoxGeometry(2 * (platformOffset + 1.75 + 0.25) , 0.2, station.length); // Breite angepasst
                 const ceilingMesh = new THREE.Mesh(ceilingGeo, stationCeilingMaterial);
                 // Decken-Y-Position angepasst
-                ceilingMesh.position.set(0, platformHeight + stationWallHeight + stationRoofHeight / 2, 0); 
+                ceilingMesh.position.set(0, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, 0); // Etwas tiefer
                 stationGroup.add(ceilingMesh);
 
                 // 4. Bahnhofsname (TextMesh) - vereinfacht als Plane für Text
@@ -601,29 +641,36 @@
                 const textMaterial = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true });
                 const textPlane = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.5), textMaterial); 
                 // Text-Y-Position angepasst
-                textPlane.position.set(platformOffset + 1.6, platformHeight + 1.5, 0); 
-                textPlane.rotation.y = Math.PI / 2; 
+                textPlane.position.set(platformOffset + 1.75 + 0.25 - 0.01, platformHeight + 1.0, 0); // Direkt an der Wand
+                textPlane.rotation.y = -Math.PI / 2; // Rotiert zur Strecke (nach innen)
                 stationGroup.add(textPlane);
+                
+                // Klon für die rechte Seite
+                const textPlaneRight = textPlane.clone();
+                textPlaneRight.position.set(-(platformOffset + 1.75 + 0.25 - 0.01), platformHeight + 1.0, 0);
+                textPlaneRight.rotation.y = Math.PI / 2; // Rotiert zur Strecke (nach innen)
+                stationGroup.add(textPlaneRight);
+
 
                 // 5. Bahnhofsbeleuchtung (zusätzliche PointLights im Bahnhof)
                 const stationLight1 = new THREE.PointLight(0xffffee, 1.5, 30, 2);
                 // Licht-Y-Position angepasst
-                stationLight1.position.set(platformOffset + 1.75, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, -station.length / 4);
+                stationLight1.position.set(platformOffset, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.7, -station.length / 4); // Über der Plattform
                 stationLight1.isStationLight = true; 
                 stationGroup.add(stationLight1);
 
                 const stationLight2 = stationLight1.clone();
-                stationLight2.position.set(platformOffset + 1.75, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, station.length / 4);
+                stationLight2.position.set(platformOffset, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.7, station.length / 4);
                 stationLight2.isStationLight = true;
                 stationGroup.add(stationLight2);
                 
                 const stationLight3 = stationLight1.clone();
-                stationLight3.position.set(-(platformOffset + 1.75), platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, -station.length / 4);
+                stationLight3.position.set(-platformOffset, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.7, -station.length / 4);
                 stationLight3.isStationLight = true;
                 stationGroup.add(stationLight3);
 
                 const stationLight4 = stationLight1.clone();
-                stationLight4.position.set(-(platformOffset + 1.75), platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.5, station.length / 4);
+                stationLight4.position.set(-platformOffset, platformHeight + stationWallHeight + stationRoofHeight / 2 - 0.7, station.length / 4);
                 stationLight4.isStationLight = true;
                 stationGroup.add(stationLight4);
             });
@@ -633,16 +680,19 @@
         function createDriverCab() {
             driverCab = new THREE.Group();
             
-            const cabMat = new THREE.MeshBasicMaterial({ 
+            const cabMat = new THREE.MeshPhongMaterial({ 
                 color: 0x333333, 
                 side: THREE.DoubleSide, 
+                transparent: true,    
+                opacity: 0.3,         
+                shininess: 50,        
+                specular: 0x222222     
             });
             
-            const dashGeo = new THREE.BoxGeometry(4, 0.2, 0.1);
+            const dashGeo = new THREE.BoxGeometry(1.5, 0.1, 0.03); 
             const dash = new THREE.Mesh(dashGeo, cabMat);
             
-            // Y-Position relativ zur Kamera (die bei 2.5m über der Strecke ist)
-            dash.position.set(0, -1.8, -2.5); // Tiefer gesetzt, um unter der Sichtlinie zu bleiben
+            dash.position.set(0, -1.0, -1.8); 
             driverCab.add(dash);
         }
 
@@ -753,7 +803,7 @@
             trackCurve.getPointAt(t, _camPos);
             trackCurve.getPointAt(t_lookat, _camLookAt);
             
-            // KORREKTUR: Kamera folgt jetzt dem "Normalenvektor" (Oben) der Strecke
+            // Kamera folgt jetzt dem "Normalenvektor" (Oben) der Strecke
             trackCurve.getTangentAt(t, _camTangent);
             _camBinormal.crossVectors(_camUp, _camTangent).normalize();
             _camNormal.crossVectors(_camTangent, _camBinormal).normalize();
@@ -761,10 +811,10 @@
             const cameraOffsetY = 2.5;
             camera.position.copy(_camPos).add(_camNormal.multiplyScalar(cameraOffsetY));
             
-            // KORREKTUR: Blickwinkel angehoben (weniger nach unten)
-            _camLookAt.y = camera.position.y - 0.5; // Schaut 0.5m unter die Augenhöhe
+            // Blickwinkel angehoben (weniger nach unten)
+            _camLookAt.y = camera.position.y - 0.2; 
             
-            // KORREKTUR: Fester "Up"-Vektor, um Neigen zu verhindern
+            // Fester "Up"-Vektor, um Neigen zu verhindern
             camera.up.set(0, 1, 0);
 
             camera.lookAt(_camLookAt);
