@@ -15,12 +15,14 @@
         }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
             margin: 0;
             overflow: hidden;
             background-color: #000;
+            cursor: pointer; /* Zeigt an, dass Klick erwartet wird */
         }
         #canvas-container {
             position: fixed;
@@ -44,12 +46,27 @@
             top: 8px !important;
             z-index: 100;
         }
+        /* Hinweis zum Starten des Audios */
+        #audio-start-prompt {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            font-size: 1.5rem;
+            text-align: center;
+            z-index: 200;
+        }
     </style>
 </head>
 <body class="text-white">
 
     <div id="canvas-container"></div>
     <div id="stats"></div> 
+
+    <div id="audio-start-prompt">Klicken oder tippen, um Audio zu aktivieren.</div>
 
     <div id="loading-screen" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
         <div class="text-center">
@@ -218,10 +235,14 @@
         // --- Globale Variablen ---
         let scene, camera, renderer, clock, stats; 
         let driverCab; 
-        let trackCurve; // Diese Kurve ist die Basis (y=0) auf Schwellenhöhe
+        let trackCurve; 
         let totalTrackLength = 0;
         let playerDistance = 0; 
         let playerSpeed = 0; 
+
+        // Sound Variablen
+        let engineSound, brakeSound;
+        let audioStarted = false; 
 
         // Steuerungs- und Physikvariablen
         let throttle = 0; 
@@ -235,7 +256,7 @@
         const MAX_BRAKE_FORCE = 200000; 
         const FRICTION_COEFFICIENT = 150; 
         const GRAVITY = 9.81;
-        const MAX_SPEED = 25; 
+        const MAX_SPEED = 25; // m/s
 
         // Strecken-Generierung
         const stations = [];
@@ -261,7 +282,8 @@
             brakeValue: document.getElementById('brake-value'),
             doorButton: document.getElementById('door-button'),
             statusMessage: document.getElementById('status-message'),
-            statsContainer: document.getElementById('stats') 
+            statsContainer: document.getElementById('stats'),
+            audioStartPrompt: document.getElementById('audio-start-prompt') 
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
@@ -308,24 +330,69 @@
             // Prozedurale Materialien generieren
             createProceduralMaterials();
             
-            // Stats initialisieren und hinzufügen
-            stats = new Stats();
-            stats.domElement.style.position = 'absolute'; 
-            stats.domElement.style.left = '8px';
-            stats.domElement.style.top = '8px';
-            ui.statsContainer.appendChild(stats.dom);
+            // Stats initialisieren und hinzufügen - FPS Counter wird nicht mehr genutzt
+            // stats = new Stats();
+            // stats.domElement.style.position = 'absolute'; 
+            // stats.domElement.style.left = '8px';
+            // stats.domElement.style.top = '8px';
+            // ui.statsContainer.appendChild(stats.dom);
 
             // Event-Listener
             window.addEventListener('resize', onWindowResize);
             setupControls();
+            setupAudioStart(); 
 
             // Asynchrones Generieren der Strecke
             setTimeout(() => {
                 buildProceduralTrack();
                 ui.loadingScreen.style.display = 'none';
                 ui.uiContainer.classList.remove('hidden');
-                animate();
             }, 50);
+        }
+
+        // --- Audio Start ---
+        function setupAudioStart() {
+            const startHandler = async () => {
+                if (!audioStarted) {
+                    await Tone.start();
+                    console.log('Audio Context started');
+                    audioStarted = true;
+                    initAudioNodes(); 
+                    ui.audioStartPrompt.style.display = 'none'; 
+                    document.body.style.cursor = 'default'; 
+                    
+                    document.body.removeEventListener('click', startHandler);
+                    document.body.removeEventListener('touchstart', startHandler);
+
+                    animate(); 
+                }
+            };
+            document.body.addEventListener('click', startHandler);
+            document.body.addEventListener('touchstart', startHandler);
+        }
+
+        // --- Audio Nodes Initialisierung ---
+        function initAudioNodes() {
+            // Engine Sound (Beschleunigung)
+            engineSound = new Tone.Oscillator({
+                frequency: 100, 
+                type: "sine", 
+                volume: -Infinity // Startet komplett leise
+            }).toDestination();
+
+            // Brake Sound (Bremsen)
+            brakeSound = new Tone.NoiseSynth({
+                noise: {
+                    type: "pink" 
+                },
+                envelope: {
+                    attack: 0.01,
+                    decay: 0.1,
+                    sustain: 0.8,
+                    release: 0.2
+                },
+                volume: -Infinity 
+            }).toDestination();
         }
 
         // --- Prozedurale Materialerzeugung ---
@@ -601,7 +668,6 @@
             const platformHeight = 0.5;
             const platformOffset = 4.5; 
             const platformWidth = 6.0; 
-            // const stationRoofHeight = 2.5; 
             const stationWallHeight = 3.0; 
 
             const up = new THREE.Vector3(0, 1, 0);
@@ -699,10 +765,8 @@
                 const bodyGeo = new THREE.CylinderGeometry(0.25, 0.25, 1.0, 8); 
                 const limbGeo = new THREE.BoxGeometry(0.15, 0.6, 0.15); 
 
-                // KORREKTUR: Personen näher an die Gleiskante
-                const minXRelativeFromEdge = 0.3; // Minimaler Abstand zur Kante
-                const maxXRelativeFromEdge = 1.0; // Maximaler Abstand zur Kante
-                // Berechnung relativ zur Kante des Bahnsteigs (-platformWidth / 2)
+                const minXRelativeFromEdge = 0.3; 
+                const maxXRelativeFromEdge = 1.0; 
                 const minXRelative = -platformWidth / 2 + minXRelativeFromEdge; 
                 const maxXRelative = -platformWidth / 2 + maxXRelativeFromEdge; 
                 const minZRelative = -station.length / 2 + 2;
@@ -724,13 +788,13 @@
                     // Arme
                     const armLeft = new THREE.Mesh(limbGeo, personMaterial);
                     armLeft.position.set(-0.3, 1.3, 0); 
-                    armLeft.rotation.z = Math.PI / 16; // Leicht nach unten
+                    armLeft.rotation.z = Math.PI / 16; 
                     personGroup.add(armLeft);
 
                     const armRight = armLeft.clone();
                     armRight.position.x = 0.3;
                     armRight.position.y = 1.3; 
-                    armRight.rotation.z = -Math.PI / 16; // Leicht nach unten
+                    armRight.rotation.z = -Math.PI / 16; 
                     personGroup.add(armRight);
 
                     // Beine
@@ -747,13 +811,12 @@
                     let randomXRelative = Math.random() * (maxXRelative - minXRelative) + minXRelative; 
                     let randomZRelative = Math.random() * (maxZRelative - minZRelative) + minZRelative;
                     
-                    personGroup.position.set(platformOffset + randomXRelative, platformHeight, randomZRelative); // Auf linker Plattform
+                    personGroup.position.set(platformOffset + randomXRelative, platformHeight, randomZRelative); 
                     personGroup.rotation.y = Math.random() * Math.PI * 2; 
                     stationGroup.add(personGroup);
 
                     // Und für die rechte Seite (gespiegelt)
                     const personGroupRight = personGroup.clone();
-                    // KORREKTUR: Spiegelung korrekt anwenden
                     personGroupRight.position.x = -(platformOffset + randomXRelative); 
                     personGroupRight.rotation.y = Math.random() * Math.PI * 2;
                     stationGroup.add(personGroupRight);
@@ -820,7 +883,7 @@
         // --- Game Loop ---
         function animate() {
             requestAnimationFrame(animate);
-            stats.begin(); 
+            // stats.begin(); // Entfernt
             
             const dt = clock.getDelta();
 
@@ -831,12 +894,15 @@
 
             renderer.render(scene, camera);
             
-            stats.end();
+            // stats.end(); // Entfernt
         }
 
-        // --- Physik-Update ---
+        // --- Physik-Update & Sound ---
+        let lastAccelerationFactor = 0; 
         function updatePhysics(dt) {
-            if (!trackCurve) return;
+            if (!trackCurve || !audioStarted || dt === 0) return; 
+
+            const oldSpeed = playerSpeed; 
 
             // 1. Kräfte berechnen
             const t = playerDistance / totalTrackLength;
@@ -856,29 +922,81 @@
             }
 
             const totalForce = throttleForce - brakeForce - frictionForce - gravityComponent; 
-            const acceleration = totalForce / MASS;
+            const calculatedAcceleration = totalForce / MASS;
             
             // 2. Geschwindigkeit und Distanz aktualisieren
-            playerSpeed += acceleration * dt;
+            playerSpeed += calculatedAcceleration * dt;
 
-            // Verhindern, dass der Zug rückwärts rollt (einfache Lösung)
+            // Verhindern, dass der Zug rückwärts rollt
             if (playerSpeed < 0 && throttle === 0 && brake === 0) {
-                 if (playerSpeed < -0.1 || brake > 0) {
-                     playerSpeed = 0;
-                 }
+                 if (playerSpeed < -0.1 || brake > 0) playerSpeed = 0;
             } else if (playerSpeed < 0) {
                 playerSpeed = 0; 
             }
-            
             if (playerSpeed > MAX_SPEED) playerSpeed = MAX_SPEED;
             
             playerDistance += playerSpeed * dt;
 
-            if (playerDistance > totalTrackLength) {
-                playerDistance -= totalTrackLength;
-            }
-            if (playerDistance < 0) {
-                playerDistance += totalTrackLength;
+            if (playerDistance > totalTrackLength) playerDistance -= totalTrackLength;
+            if (playerDistance < 0) playerDistance += totalTrackLength;
+
+            // --- Sound Steuerung ---
+            const now = Tone.now();
+            const minEngineFreq = 80;
+            const maxEngineFreq = 400;
+            const speedRatio = playerSpeed / MAX_SPEED;
+            
+            // Tatsächliche Beschleunigung berechnen
+            const actualAcceleration = (playerSpeed - oldSpeed) / dt;
+
+            if (throttle > 0 && playerSpeed > 0.1) {
+                // Beschleunigen oder Geschwindigkeit halten
+                if (engineSound.state !== "started") {
+                    engineSound.start(now);
+                    engineSound.volume.value = -Infinity; // Start leise
+                }
+                const targetFreq = minEngineFreq + speedRatio * (maxEngineFreq - minEngineFreq);
+                engineSound.frequency.rampTo(targetFreq, 0.1);
+
+                // Lautstärke basierend auf Beschleunigung und Throttle
+                const baseVolume = THREE.MathUtils.lerp(-40, -30, throttle); 
+                const accelerationFactor = THREE.MathUtils.clamp(actualAcceleration * 2.0, 0, 1); 
+                lastAccelerationFactor = THREE.MathUtils.lerp(lastAccelerationFactor, accelerationFactor, 0.1); 
+                const targetVolume = baseVolume + THREE.MathUtils.lerp(0, 15, lastAccelerationFactor); 
+                
+                engineSound.volume.rampTo(targetVolume, 0.1); 
+                
+                if (brakeSound.volume.value > -Infinity) {
+                    brakeSound.triggerRelease(now); 
+                }
+
+            } else if (brake > 0 && playerSpeed > 0.1) {
+                // Bremsen
+                if (brakeSound.volume.value === -Infinity) {
+                     brakeSound.triggerAttack(now); 
+                }
+                const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, brake * speedRatio);
+                brakeSound.volume.rampTo(targetBrakeVol, 0.05);
+
+                if (engineSound.state === "started") {
+                     engineSound.volume.rampTo(-Infinity, 0.5, now); 
+                     setTimeout(() => { if (brake > 0) engineSound.stop() }, 500); 
+                     lastAccelerationFactor = 0; 
+                }
+            } else {
+                // Leerlauf oder Stillstand
+                 if (engineSound.state === "started") {
+                     const idleVolume = (playerSpeed > 0.1) ? -40 : -Infinity;
+                     engineSound.volume.rampTo(idleVolume, 0.5, now); 
+                     engineSound.frequency.rampTo(minEngineFreq + speedRatio * 20, 0.5); 
+                     if (playerSpeed < 0.1) {
+                        setTimeout(() => { if(playerSpeed < 0.1 && throttle === 0 && brake === 0) engineSound.stop() }, 500); 
+                     }
+                     lastAccelerationFactor = 0; 
+                 }
+                if (brakeSound.volume.value > -Infinity) {
+                    brakeSound.triggerRelease(now); 
+                }
             }
         }
 
