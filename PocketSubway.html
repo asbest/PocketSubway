@@ -247,7 +247,8 @@
         const MAX_CURVATURE = 0.001; 
         const MAX_INCLINE_RATE = 0.0005; // Maximale *Änderungsrate* der Steigung pro Meter
         const MAX_GRADE = 0.025; // Maximale *absolute* Steigung (2.5%)
-        const TUBE_SEGMENTS = 800; 
+        // KORREKTUR: TUBE_SEGMENTS weiter reduziert
+        const TUBE_SEGMENTS = 600; 
 
         // DOM-Elemente
         const ui = {
@@ -390,7 +391,7 @@
             let currentDir = new THREE.Vector3(0, 0, -1); 
             
             let currentCurvature = 0;
-            let currentInclineRate = 0; // Umbenannt von currentIncline
+            let currentInclineRate = 0; 
             totalTrackLength = 0;
 
             const up = new THREE.Vector3(0, 1, 0);
@@ -415,7 +416,7 @@
                 tempQuat.setFromAxisAngle(tempVec, currentInclineRate);
                 currentDir.applyQuaternion(tempQuat);
 
-                // --- KORREKTUR: Clamp the resulting incline (tangent.y) ---
+                // Clamp the resulting incline (tangent.y)
                 if (Math.abs(currentDir.y) > MAX_GRADE) {
                     currentDir.y = Math.sign(currentDir.y) * MAX_GRADE;
                     currentDir.normalize(); // Re-normalize after clamping y
@@ -450,7 +451,7 @@
                 tempQuat.setFromAxisAngle(tempVec, currentInclineRate);
                 currentDir.applyQuaternion(tempQuat);
 
-                // --- KORREKTUR: Clamp the resulting incline (tangent.y) ---
+                // Clamp the resulting incline (tangent.y)
                 if (Math.abs(currentDir.y) > MAX_GRADE) {
                     currentDir.y = Math.sign(currentDir.y) * MAX_GRADE;
                     currentDir.normalize(); // Re-normalize after clamping y
@@ -499,7 +500,7 @@
                     tempQuat.setFromAxisAngle(tempVec, currentInclineRate);
                     currentDir.applyQuaternion(tempQuat);
                     
-                    // --- KORREKTUR: Clamp the resulting incline (tangent.y) ---
+                    // Clamp the resulting incline (tangent.y)
                     if (Math.abs(currentDir.y) > MAX_GRADE) {
                         currentDir.y = Math.sign(currentDir.y) * MAX_GRADE;
                         currentDir.normalize(); // Re-normalize after clamping y
@@ -958,6 +959,8 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            // KORREKTUR: Pixel Ratio auch bei Resize begrenzen
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         }
 
         // --- Start ---
