@@ -299,7 +299,7 @@
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
-        let tunnelMaterial, railMaterial, tieMaterial, ballastMaterial, cableMaterial;
+        let tunnelMaterial, railMaterial, cableMaterial;
         let stationWallMaterial, stationFloorMaterial;
         
         // --- Initialisierung ---
@@ -437,29 +437,7 @@
                 metalness: 0.9 
             }); 
             
-            // Schwellen Material
-            tieMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x4a2a0a, 
-                roughness: 0.9 
-            }); 
 
-            // Schotterbett Material
-            const ballastTexture = generateNoiseTexture(256, 256, {
-                scale: 15,
-                octaves: 5,
-                persistence: 0.6,
-                lacunarity: 2.5,
-                color1: 0x4a4a4a,
-                color2: 0x2c2c2c
-            });
-            ballastTexture.wrapS = THREE.RepeatWrapping;
-            ballastTexture.wrapT = THREE.RepeatWrapping;
-            ballastTexture.repeat.set(totalTrackLength / 5, 2);
-            ballastMaterial = new THREE.MeshStandardMaterial({
-                map: ballastTexture,
-                roughness: 0.95,
-                metalness: 0.01
-            });
 
             // Kabel Material
             cableMaterial = new THREE.MeshStandardMaterial({
@@ -706,56 +684,7 @@
             scene.add(railMeshLeft);
             scene.add(railMeshRight);
 
-            // 3. Schotterbett
-            const ballastGeo = new THREE.BoxGeometry(3.5, 0.3, 1.0);
-            const ballastCount = Math.floor(totalTrackLength);
-            const ballastMesh = new THREE.InstancedMesh(ballastGeo, ballastMaterial, ballastCount);
 
-            const dummyBallast = new THREE.Object3D();
-            const lookAtPosBallast = new THREE.Vector3();
-
-            for (let i = 0; i < ballastCount; i++) {
-                const t = i / ballastCount;
-                const t_next = (i + 1) / ballastCount;
-
-                curve.getPointAt(t, dummyBallast.position);
-                curve.getPointAt(t_next, lookAtPosBallast);
-
-                dummyBallast.position.y -= 0.25;
-
-                dummyBallast.lookAt(lookAtPosBallast);
-
-                dummyBallast.updateMatrix();
-                ballastMesh.setMatrixAt(i, dummyBallast.matrix);
-            }
-            ballastMesh.instanceMatrix.needsUpdate = true;
-            scene.add(ballastMesh);
-
-            // 4. Schwellen
-            const tieGeo = new THREE.BoxGeometry(2.5, 0.15, 0.3);
-            const tieCount = Math.floor(totalTrackLength / 1.5); 
-            const tieMesh = new THREE.InstancedMesh(tieGeo, tieMaterial, tieCount);
-            
-            const dummy = new THREE.Object3D();
-            const lookAtPos = new THREE.Vector3();
-
-            for (let i = 0; i < tieCount; i++) {
-                const t = (i / tieCount);
-                const t_next = (i + 1) / tieCount;
-                
-                curve.getPointAt(t, dummy.position);
-                curve.getPointAt(t_next, lookAtPos);
-                
-                // Schwellen sind bei y=0 zentriert (halbe Dicke nach unten)
-                dummy.position.y -= 0.075; 
-                
-                dummy.lookAt(lookAtPos);
-                
-                dummy.updateMatrix();
-                tieMesh.setMatrixAt(i, dummy.matrix);
-            }
-            tieMesh.instanceMatrix.needsUpdate = true;
-            scene.add(tieMesh);
         }
 
         function createTunnelArches(curve, tunnelOffsetY) {
