@@ -1092,7 +1092,7 @@
         // --- Physik-Update & Sound ---
         let lastAccelerationFactor = 0; 
         function updatePhysics(dt) {
-            if (!trackCurve || !audioStarted || dt === 0) return; 
+            if (!trackCurve || dt === 0) return;
 
             const oldSpeed = playerSpeed; 
 
@@ -1133,61 +1133,63 @@
             if (playerDistance < 0) playerDistance += totalTrackLength;
 
             // --- Sound Steuerung ---
-            const now = Tone.now();
-            const minEngineFreq = 80;
-            const maxEngineFreq = 400;
-            const speedRatio = playerSpeed / MAX_SPEED;
-            
-            // Tatsächliche Beschleunigung berechnen
-            const actualAcceleration = (playerSpeed - oldSpeed) / dt;
+            if (audioStarted) {
+                const now = Tone.now();
+                const minEngineFreq = 80;
+                const maxEngineFreq = 400;
+                const speedRatio = playerSpeed / MAX_SPEED;
 
-            if (throttle > 0 && playerSpeed > 0.1) {
-                // Beschleunigen oder Geschwindigkeit halten
-                if (engineSound.state !== "started") {
-                    engineSound.start(now);
-                    engineSound.volume.value = -Infinity; // Start leise
-                }
-                const targetFreq = minEngineFreq + speedRatio * (maxEngineFreq - minEngineFreq);
-                engineSound.frequency.rampTo(targetFreq, 0.1);
+                // Tatsächliche Beschleunigung berechnen
+                const actualAcceleration = (playerSpeed - oldSpeed) / dt;
 
-                // Lautstärke basierend auf Beschleunigung und Throttle
-                const baseVolume = THREE.MathUtils.lerp(-40, -30, throttle); 
-                const accelerationFactor = THREE.MathUtils.clamp(actualAcceleration * 2.0, 0, 1); 
-                lastAccelerationFactor = THREE.MathUtils.lerp(lastAccelerationFactor, accelerationFactor, 0.1); 
-                const targetVolume = baseVolume + THREE.MathUtils.lerp(0, 15, lastAccelerationFactor); 
-                
-                engineSound.volume.rampTo(targetVolume, 0.1); 
-                
-                if (brakeSound.volume.value > -Infinity) {
-                    brakeSound.triggerRelease(now); 
-                }
+                if (throttle > 0 && playerSpeed > 0.1) {
+                    // Beschleunigen oder Geschwindigkeit halten
+                    if (engineSound.state !== "started") {
+                        engineSound.start(now);
+                        engineSound.volume.value = -Infinity; // Start leise
+                    }
+                    const targetFreq = minEngineFreq + speedRatio * (maxEngineFreq - minEngineFreq);
+                    engineSound.frequency.rampTo(targetFreq, 0.1);
 
-            } else if (brake > 0 && playerSpeed > 0.1) {
-                // Bremsen
-                if (brakeSound.volume.value === -Infinity) {
-                     brakeSound.triggerAttack(now); 
-                }
-                const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, brake * speedRatio);
-                brakeSound.volume.rampTo(targetBrakeVol, 0.05);
+                    // Lautstärke basierend auf Beschleunigung und Throttle
+                    const baseVolume = THREE.MathUtils.lerp(-40, -30, throttle);
+                    const accelerationFactor = THREE.MathUtils.clamp(actualAcceleration * 2.0, 0, 1);
+                    lastAccelerationFactor = THREE.MathUtils.lerp(lastAccelerationFactor, accelerationFactor, 0.1);
+                    const targetVolume = baseVolume + THREE.MathUtils.lerp(0, 15, lastAccelerationFactor);
 
-                if (engineSound.state === "started") {
-                     engineSound.volume.rampTo(-Infinity, 0.5, now); 
-                     setTimeout(() => { if (brake > 0) engineSound.stop() }, 500); 
-                     lastAccelerationFactor = 0; 
-                }
-            } else {
-                // Leerlauf oder Stillstand
-                 if (engineSound.state === "started") {
-                     const idleVolume = (playerSpeed > 0.1) ? -40 : -Infinity;
-                     engineSound.volume.rampTo(idleVolume, 0.5, now); 
-                     engineSound.frequency.rampTo(minEngineFreq + speedRatio * 20, 0.5); 
-                     if (playerSpeed < 0.1) {
-                        setTimeout(() => { if(playerSpeed < 0.1 && throttle === 0 && brake === 0) engineSound.stop() }, 500); 
+                    engineSound.volume.rampTo(targetVolume, 0.1);
+
+                    if (brakeSound.volume.value > -Infinity) {
+                        brakeSound.triggerRelease(now);
+                    }
+
+                } else if (brake > 0 && playerSpeed > 0.1) {
+                    // Bremsen
+                    if (brakeSound.volume.value === -Infinity) {
+                         brakeSound.triggerAttack(now);
+                    }
+                    const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, brake * speedRatio);
+                    brakeSound.volume.rampTo(targetBrakeVol, 0.05);
+
+                    if (engineSound.state === "started") {
+                         engineSound.volume.rampTo(-Infinity, 0.5, now);
+                         setTimeout(() => { if (brake > 0) engineSound.stop() }, 500);
+                         lastAccelerationFactor = 0;
+                    }
+                } else {
+                    // Leerlauf oder Stillstand
+                     if (engineSound.state === "started") {
+                         const idleVolume = (playerSpeed > 0.1) ? -40 : -Infinity;
+                         engineSound.volume.rampTo(idleVolume, 0.5, now);
+                         engineSound.frequency.rampTo(minEngineFreq + speedRatio * 20, 0.5);
+                         if (playerSpeed < 0.1) {
+                            setTimeout(() => { if(playerSpeed < 0.1 && throttle === 0 && brake === 0) engineSound.stop() }, 500);
+                         }
+                         lastAccelerationFactor = 0;
                      }
-                     lastAccelerationFactor = 0; 
-                 }
-                if (brakeSound.volume.value > -Infinity) {
-                    brakeSound.triggerRelease(now); 
+                    if (brakeSound.volume.value > -Infinity) {
+                        brakeSound.triggerRelease(now);
+                    }
                 }
             }
         }
