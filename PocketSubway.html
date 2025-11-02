@@ -256,7 +256,7 @@
         const MAX_BRAKE_FORCE = 200000; 
         const FRICTION_COEFFICIENT = 150; 
         const GRAVITY = 9.81;
-        const MAX_SPEED = 25; // m/s
+        const MAX_SPEED = 33.3; // 120 km/h in m/s
 
         // Strecken-Generierung
         const stations = [];
@@ -398,8 +398,14 @@
         // --- Prozedurale Materialerzeugung ---
         function createProceduralMaterials() {
             // Tunnel Material
+            const concreteTexture = generateNoiseTexture(512, 512, 64, 0x505050, 0x3c3c3c);
+            concreteTexture.wrapS = THREE.RepeatWrapping;
+            concreteTexture.wrapT = THREE.RepeatWrapping;
+            // Die Textur wird TUBE_SEGMENTS / 4 mal in Längsrichtung und 8 mal im Umfang wiederholt für ein dichteres Muster.
+            concreteTexture.repeat.set(TUBE_SEGMENTS / 4, 8);
+
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x3a2e26, 
+                map: concreteTexture,
                 side: THREE.BackSide, 
                 roughness: 0.8,
                 metalness: 0.1
