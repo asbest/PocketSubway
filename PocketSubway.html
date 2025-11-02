@@ -66,7 +66,6 @@
     <div id="canvas-container"></div>
     <div id="stats"></div> 
 
-    <div id="audio-start-prompt">Klicken oder tippen, um Audio zu aktivieren.</div>
 
     <div id="loading-screen" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
         <div class="text-center">
@@ -294,12 +293,11 @@
             brakeValue: document.getElementById('brake-value'),
             doorButton: document.getElementById('door-button'),
             statusMessage: document.getElementById('status-message'),
-            statsContainer: document.getElementById('stats'),
-            audioStartPrompt: document.getElementById('audio-start-prompt') 
+            statsContainer: document.getElementById('stats')
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
-        let tunnelMaterial, railMaterial, cableMaterial;
+        let tunnelMaterial, railMaterial, tieMaterial, cableMaterial;
         let stationWallMaterial, stationFloorMaterial;
         
         // --- Initialisierung ---
@@ -352,7 +350,9 @@
             // Event-Listener
             window.addEventListener('resize', onWindowResize);
             setupControls();
-            setupAudioStart(); 
+
+            // Audio- und Animationsstart
+            startAudioAndAnimation();
 
             // Asynchrones Generieren der Strecke
             setTimeout(() => {
@@ -362,25 +362,43 @@
             }, 50);
         }
 
-        // --- Audio Start ---
-        function setupAudioStart() {
-            const startHandler = async () => {
+        // --- Audio & Animation Start ---
+        async function startAudioAndAnimation() {
+            // Animation sofort starten, unabhängig vom Audio
+            animate();
+
+            // Versuchen, den Audio-Kontext automatisch zu starten
+            try {
                 if (!audioStarted) {
                     await Tone.start();
-                    console.log('Audio Context started');
+                    console.log('Audio Context started automatically.');
                     audioStarted = true;
-                    initAudioNodes(); 
-                    ui.audioStartPrompt.style.display = 'none'; 
-                    document.body.style.cursor = 'default'; 
-                    
-                    document.body.removeEventListener('click', startHandler);
-                    document.body.removeEventListener('touchstart', startHandler);
+                    initAudioNodes();
+                    return; // Erfolg, kein Fallback nötig
+                }
+            } catch (e) {
+                console.warn('Could not start audio context automatically. Waiting for user interaction.');
+            }
 
-                    animate(); 
+            // Fallback: Start bei erster Benutzerinteraktion (Klick/Touch)
+            const startOnInteraction = async () => {
+                if (!audioStarted) {
+                    try {
+                        await Tone.start();
+                        console.log('Audio Context started on user interaction.');
+                        audioStarted = true;
+                        initAudioNodes();
+                        // Listener nach Erfolg entfernen
+                        document.body.removeEventListener('mousedown', startOnInteraction);
+                        document.body.removeEventListener('touchstart', startOnInteraction);
+                    } catch (err) {
+                        console.error('Failed to start audio on interaction:', err);
+                    }
                 }
             };
-            document.body.addEventListener('click', startHandler);
-            document.body.addEventListener('touchstart', startHandler);
+
+            document.body.addEventListener('mousedown', startOnInteraction);
+            document.body.addEventListener('touchstart', startOnInteraction);
         }
 
         // --- Audio Nodes Initialisierung ---
@@ -437,7 +455,11 @@
                 metalness: 0.9 
             }); 
             
-
+            // Schwellen Material
+            tieMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4a2a0a,
+                roughness: 0.9
+            });
 
             // Kabel Material
             cableMaterial = new THREE.MeshStandardMaterial({
@@ -685,6 +707,31 @@
             scene.add(railMeshRight);
 
 
+            // 4. Schwellen
+            const tieGeo = new THREE.BoxGeometry(2.5, 0.15, 0.3);
+            const tieCount = Math.floor(totalTrackLength / 1.5);
+            const tieMesh = new THREE.InstancedMesh(tieGeo, tieMaterial, tieCount);
+
+            const dummy = new THREE.Object3D();
+            const lookAtPos = new THREE.Vector3();
+
+            for (let i = 0; i < tieCount; i++) {
+                const t = (i / tieCount);
+                const t_next = (i + 1) / tieCount;
+
+                curve.getPointAt(t, dummy.position);
+                curve.getPointAt(t_next, lookAtPos);
+
+                // Schwellen sind bei y=0 zentriert (halbe Dicke nach unten)
+                dummy.position.y -= 0.075;
+
+                dummy.lookAt(lookAtPos);
+
+                dummy.updateMatrix();
+                tieMesh.setMatrixAt(i, dummy.matrix);
+            }
+            tieMesh.instanceMatrix.needsUpdate = true;
+            scene.add(tieMesh);
         }
 
         function createTunnelArches(curve, tunnelOffsetY) {
