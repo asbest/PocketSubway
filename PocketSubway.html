@@ -204,7 +204,8 @@
         
         const simplex = new SimplexNoise();
 
-        function generateNoiseTexture(width, height, scale, color1, color2) {
+        function generateNoiseTexture(width, height, options) {
+            const { scale, octaves, persistence, lacunarity, color1, color2 } = options;
             const canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
@@ -217,8 +218,19 @@
 
             for (let x = 0; x < width; x++) {
                 for (let y = 0; y < height; y++) {
-                    const value = (simplex.noise2D(x / scale, y / scale) + 1) / 2; // Normalize to 0-1
+                    let total = 0;
+                    let frequency = 1;
+                    let amplitude = 1;
+                    let maxValue = 0;
                     
+                    for(let i=0; i < octaves; i++) {
+                        total += simplex.noise2D(x * frequency / scale, y * frequency / scale) * amplitude;
+                        maxValue += amplitude;
+                        amplitude *= persistence;
+                        frequency *= lacunarity;
+                    }
+
+                    const value = (total / maxValue + 1) / 2; // Normalize to 0-1
                     const interpolatedColor = new THREE.Color().lerpColors(c1, c2, value);
 
                     const i = (y * width + x) * 4;
@@ -256,7 +268,7 @@
         const MAX_BRAKE_FORCE = 200000; 
         const FRICTION_COEFFICIENT = 150; 
         const GRAVITY = 9.81;
-        const MAX_SPEED = 25; // m/s
+        const MAX_SPEED = 33.3; // 120 km/h in m/s
 
         // Strecken-Generierung
         const stations = [];
@@ -397,12 +409,25 @@
 
         // --- Prozedurale Materialerzeugung ---
         function createProceduralMaterials() {
-            // Tunnel Material
+             // Tunnel Material
+            const concreteTexture = generateNoiseTexture(512, 512, {
+                scale: 80,
+                octaves: 4,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                color1: 0x888888,
+                color2: 0x666666
+            });
+            concreteTexture.wrapS = THREE.RepeatWrapping;
+            concreteTexture.wrapT = THREE.RepeatWrapping;
+            // Die Textur wird TUBE_SEGMENTS / 4 mal in Längsrichtung und 8 mal im Umfang wiederholt für ein dichteres Muster.
+            concreteTexture.repeat.set(TUBE_SEGMENTS / 4, 8);
+
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x3a2e26, 
+                map: concreteTexture,
                 side: THREE.BackSide, 
-                roughness: 0.8,
-                metalness: 0.1
+                roughness: 0.9,
+                metalness: 0.05
             });
 
             // Schienen Material
@@ -419,7 +444,14 @@
             }); 
 
             // Bahnhof Materialien
-            const stationWallTexture = generateNoiseTexture(512, 128, 12, 0xaaaaaa, 0x888888); 
+            const stationWallTexture = generateNoiseTexture(512, 128, {
+                scale: 12,
+                octaves: 2,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                color1: 0xaaaaaa,
+                color2: 0x888888
+            });
             stationWallTexture.wrapS = THREE.RepeatWrapping;
             stationWallTexture.wrapT = THREE.RepeatWrapping;
             stationWallMaterial = new THREE.MeshStandardMaterial({ 
@@ -428,7 +460,14 @@
                 metalness: 0.1
             });
             
-            const stationFloorTexture = generateNoiseTexture(256, 256, 50, 0xcccccc, 0x999999); 
+            const stationFloorTexture = generateNoiseTexture(256, 256, {
+                scale: 50,
+                octaves: 3,
+                persistence: 0.4,
+                lacunarity: 2.2,
+                color1: 0xcccccc,
+                color2: 0x999999
+            });
             stationFloorTexture.wrapS = THREE.RepeatWrapping;
             stationFloorTexture.wrapT = THREE.RepeatWrapping;
             stationFloorMaterial = new THREE.MeshStandardMaterial({ 
@@ -625,6 +664,9 @@
             const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
             scene.add(tunnelMesh);
 
+            // Tunnelbögen hinzufügen
+            createTunnelArches(curve, tunnelOffsetY);
+
             // 2. Schienen
             const railCurveLeft = new THREE.CatmullRomCurve3(railPointsLeft);
             const railCurveRight = new THREE.CatmullRomCurve3(railPointsRight);
@@ -661,6 +703,64 @@
             }
             tieMesh.instanceMatrix.needsUpdate = true;
             scene.add(tieMesh);
+        }
+
+        function createTunnelArches(curve, tunnelOffsetY) {
+            const archSpacing = 50; // Alle 50 Meter ein Bogen
+            const archRadius = 5.2; // Etwas größer als der Tunnelradius
+            const archTubeRadius = 0.15;
+            const archColor = 0xFFD700; // Goldgelb für einen warmen Leuchteffekt
+
+            const archGeo = new THREE.TorusGeometry(archRadius, archTubeRadius, 8, 32);
+            const archMat = new THREE.MeshBasicMaterial({ color: archColor });
+
+            const archCount = Math.floor(totalTrackLength / archSpacing);
+            const archMesh = new THREE.InstancedMesh(archGeo, archMat, archCount);
+
+            const dummy = new THREE.Object3D();
+            const pos = new THREE.Vector3();
+            const tangent = new THREE.Vector3();
+            const up = new THREE.Vector3(0, 1, 0);
+            const binormal = new THREE.Vector3();
+            const normal = new THREE.Vector3();
+
+            let archIndex = 0;
+            for (let i = 0; i < archCount; i++) {
+                const distance = i * archSpacing;
+
+                // Prüfen, ob der Bogen in einer Station wäre
+                let inStation = false;
+                for (const station of stations) {
+                    if (distance > station.distance - station.length / 2 && distance < station.distance + station.length / 2) {
+                        inStation = true;
+                        break;
+                    }
+                }
+                if (inStation) continue;
+
+                const t = distance / totalTrackLength;
+                curve.getPointAt(t, pos);
+                curve.getTangentAt(t, tangent);
+
+                // Berechne lokale Achsen
+                binormal.crossVectors(up, tangent).normalize();
+                normal.crossVectors(tangent, binormal).normalize();
+
+                // Position des Bogens (im Zentrum des Tunnels)
+                dummy.position.copy(pos).addScaledVector(normal, tunnelOffsetY);
+
+                // Ausrichtung des Bogens
+                const lookAtPos = dummy.position.clone().add(tangent);
+                dummy.up.copy(normal);
+                dummy.lookAt(lookAtPos);
+
+                dummy.updateMatrix();
+                archMesh.setMatrixAt(archIndex, dummy.matrix);
+                archIndex++;
+            }
+            archMesh.count = archIndex; // Wichtig, falls Bögen übersprungen wurden
+            archMesh.instanceMatrix.needsUpdate = true;
+            scene.add(archMesh);
         }
 
         // --- Bahnhöfe ---
