@@ -243,6 +243,46 @@
             return new THREE.CanvasTexture(canvas);
         }
 
+        function generateBrickTexture(width, height) {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            const brickWidth = 60;
+            const brickHeight = 20;
+            const mortarThickness = 4;
+            const brickColor = '#8B4513'; // SaddleBrown
+            const mortarColor = '#808080'; // Gray
+
+            // Hintergrund (Fugen)
+            ctx.fillStyle = mortarColor;
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = brickColor;
+
+            for (let y = 0; y < height; y += brickHeight + mortarThickness) {
+                for (let x = 0; x < width; x += brickWidth + mortarThickness) {
+                    let offsetX = 0;
+                    // Jede zweite Reihe versetzen
+                    if ((y / (brickHeight + mortarThickness)) % 2 === 1) {
+                        offsetX = -(brickWidth + mortarThickness) / 2;
+                    }
+
+                    // Zeichne Ziegelstein
+                    ctx.fillRect(x + offsetX, y, brickWidth, brickHeight);
+                    // Um das Muster nahtlos zu machen, zeichne auch den Teil, der links/rechts herausragt
+                     if (offsetX !== 0) {
+                        ctx.fillRect(x + offsetX + width, y, brickWidth, brickHeight);
+                    }
+
+                }
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
+            return texture;
+        }
+
         // --- Globale Variablen ---
         let scene, camera, renderer, clock, stats; 
         let driverCab; 
@@ -428,21 +468,15 @@
         // --- Prozedurale Materialerzeugung ---
         function createProceduralMaterials() {
              // Tunnel Material
-            const concreteTexture = generateNoiseTexture(512, 512, {
-                scale: 80,
-                octaves: 4,
-                persistence: 0.5,
-                lacunarity: 2.0,
-                color1: 0x888888,
-                color2: 0x666666
-            });
-            concreteTexture.wrapS = THREE.RepeatWrapping;
-            concreteTexture.wrapT = THREE.RepeatWrapping;
-            // Die Textur wird TUBE_SEGMENTS / 4 mal in Längsrichtung und 8 mal im Umfang wiederholt für ein dichteres Muster.
-            concreteTexture.repeat.set(TUBE_SEGMENTS / 4, 8);
+            const brickTexture = generateBrickTexture(256, 256);
+            brickTexture.wrapS = THREE.RepeatWrapping;
+            brickTexture.wrapT = THREE.RepeatWrapping;
+            // Die Wiederholung in Y-Richtung (Umfang) wird auf 40 gesetzt für eine realistischere Ziegelhöhe.
+            // Die X-Wiederholung (Länge) wird nach der Streckengenerierung basierend auf der echten Länge berechnet.
+            brickTexture.repeat.set(1, 40);
 
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
-                map: concreteTexture,
+                map: brickTexture,
                 side: THREE.BackSide, 
                 roughness: 0.9,
                 metalness: 0.05
@@ -641,6 +675,13 @@
             
             // Bahnhöfe erstellen
             createStations(trackCurve);
+
+            // Passe die Wiederholung der Ziegeltextur an die tatsächliche Streckenlänge an
+            const tunnelCircumference = 2 * Math.PI * 5.0; // tunnelRadius = 5.0
+            const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
+            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Assume square bricks for now
+            tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
+            tunnelMaterial.map.needsUpdate = true;
         }
 
         // --- Strecken-Geometrie ---
