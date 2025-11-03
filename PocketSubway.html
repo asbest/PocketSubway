@@ -283,6 +283,19 @@
             return texture;
         }
 
+        function generateFunnyStationName() {
+            const prefixes = ['Groß', 'Klein', 'Alt', 'Neu', 'Ober', 'Unter', 'Bad', 'Sankt', 'Prost'];
+            const middles = ['Kicher', 'Enten', 'Gänse', 'Frosch', 'Mäuse', 'Katzen', 'Hunde', 'Brumm', 'Donner', 'Nebel', 'Schatten'];
+            const suffixes = ['bach', 'hausen', 'tal', 'berg', 'dorf', 'stadt', 'burg', 'moor', 'wald', 'hafen', 'brück'];
+
+            const hasPrefix = Math.random() > 0.3; // 70% Wahrscheinlichkeit für ein Präfix
+            const prefix = hasPrefix ? prefixes[Math.floor(Math.random() * prefixes.length)] + '-' : '';
+            const middle = middles[Math.floor(Math.random() * middles.length)];
+            const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+
+            return prefix + middle + suffix;
+        }
+
         // --- Globale Variablen ---
         let scene, camera, renderer, clock, stats; 
         let driverCab; 
@@ -586,7 +599,7 @@
             targetInclineRate = 0;   
             
             stations.push({
-                name: `Haltestelle ${String.fromCharCode(65 + stations.length)}`,
+                name: generateFunnyStationName(),
                 distance: totalTrackLength + segmentLength / 2, 
                 length: segmentLength
             });
@@ -626,7 +639,7 @@
                     targetCurvature = 0; 
                     targetInclineRate = 0;   
                     stations.push({
-                        name: `Haltestelle ${String.fromCharCode(65 + stations.length)}`,
+                        name: generateFunnyStationName(),
                         distance: totalTrackLength + segmentLength / 2,
                         length: segmentLength
                     });
