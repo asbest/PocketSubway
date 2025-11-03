@@ -739,7 +739,7 @@
 
             // 1. Der Tunnel
             const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
-            const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 8, false);
+            const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 32, false);
             const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
             scene.add(tunnelMesh);
 
