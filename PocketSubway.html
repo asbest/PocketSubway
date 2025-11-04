@@ -99,8 +99,14 @@
 
         <div class="w-full flex justify-between items-end pointer-events-auto">
             
-            <div class="flex space-x-8 bg-black bg-opacity-50 p-4 rounded-lg shadow-lg">
+            <div class="flex space-x-8 bg-black bg-opacity-50 p-4 rounded-lg shadow-lg items-end">
                 <div class="flex flex-col items-center">
+                    <!-- Booster Icon -->
+                    <div id="booster-button" class="hidden cursor-pointer bg-blue-500 hover:bg-blue-400 rounded-full w-10 h-10 flex items-center justify-center transition-all duration-300 transform hover:scale-110 mb-2" title="Max Geschwindigkeit auf 200 km/h erhöhen (kostet 100 Punkte)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
                     <label for="throttle" class="text-sm font-semibold text-green-400">SCHUB</label>
                     <input type="range" id="throttle" orient="vertical" min="0" max="100" value="0" class="mt-2 h-36 md:h-48 accent-green-500">
                     <span id="throttle-value" class="font-mono text-lg mt-2">0%</span>
@@ -321,17 +327,18 @@
         let atStation = false;
         let currentStation = null;
         let score = 0;
+        let boosterPurchased = false;
 
         const MASS = 50000; 
         const MAX_THROTTLE_FORCE = 80000; 
         const MAX_BRAKE_FORCE = 200000; 
         const FRICTION_COEFFICIENT = 150; 
         const GRAVITY = 9.81;
-        const MAX_SPEED = 33.3; // 120 km/h in m/s
+        let MAX_SPEED = 33.3; // 120 km/h in m/s
 
         // Strecken-Generierung
         const stations = [];
-        const NUM_SEGMENTS = 50; 
+        const NUM_SEGMENTS = 10;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
         const STATION_LENGTH = 200; 
@@ -354,7 +361,8 @@
             brakeValue: document.getElementById('brake-value'),
             doorButton: document.getElementById('door-button'),
             statusMessage: document.getElementById('status-message'),
-            statsContainer: document.getElementById('stats')
+            statsContainer: document.getElementById('stats'),
+            boosterButton: document.getElementById('booster-button')
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
@@ -421,6 +429,7 @@
                 ui.loadingScreen.style.display = 'none';
                 ui.uiContainer.classList.remove('hidden');
             }, 50);
+
         }
 
         // --- Audio & Animation Start ---
@@ -1134,6 +1143,15 @@
                     updateDoorButton();
                 }
             });
+
+            ui.boosterButton.addEventListener('click', () => {
+                if (score >= 100 && !boosterPurchased) {
+                    score -= 100;
+                    boosterPurchased = true;
+                    MAX_SPEED = 55.6; // 200 km/h
+                    ui.boosterButton.classList.add('hidden');
+                }
+            });
         }
         
         // --- Game Loop ---
@@ -1373,6 +1391,12 @@
         function updateUI() {
             ui.speedDisplay.innerText = (window.playerSpeed * 3.6).toFixed(0);
             ui.scoreDisplay.innerText = score;
+
+            if (score >= 100 && !boosterPurchased) {
+                ui.boosterButton.classList.remove('hidden');
+            } else {
+                ui.boosterButton.classList.add('hidden');
+            }
         }
         
         function updateDoorButton() {
