@@ -99,7 +99,7 @@
 
         <div class="w-full flex justify-between items-end pointer-events-auto">
             
-            <div class="flex space-x-8 bg-black bg-opacity-50 p-4 rounded-lg shadow-lg">
+            <div class="flex space-x-8 bg-black bg-opacity-50 p-4 rounded-lg shadow-lg items-center">
                 <div class="flex flex-col items-center">
                     <label for="throttle" class="text-sm font-semibold text-green-400">SCHUB</label>
                     <input type="range" id="throttle" orient="vertical" min="0" max="100" value="0" class="mt-2 h-36 md:h-48 accent-green-500">
@@ -109,6 +109,12 @@
                     <label for="brake" class="text-sm font-semibold text-red-400">BREMSE</label>
                     <input type="range" id="brake" orient="vertical" min="0" max="100" value="0" class="mt-2 h-36 md:h-48 accent-red-500">
                     <span id="brake-value" class="font-mono text-lg mt-2">0%</span>
+                </div>
+                <!-- Booster Icon -->
+                <div id="booster-button" class="hidden cursor-pointer bg-blue-500 hover:bg-blue-400 rounded-full w-16 h-16 flex items-center justify-center transition-all duration-300 transform hover:scale-110" title="Max Geschwindigkeit auf 200 km/h erhöhen (kostet 100 Punkte)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
                 </div>
             </div>
 
@@ -308,26 +314,27 @@
         let trackCurve; 
         let totalTrackLength = 0;
         let playerDistance = 0; 
-        window.playerSpeed = 0;
+        let playerSpeed = 0;
 
         // Sound Variablen
         let engineSound, brakeSound;
         let audioStarted = false; 
 
         // Steuerungs- und Physikvariablen
-        window.throttle = 0;
-        window.brake = 0;
+        let throttle = 0;
+        let brake = 0;
         let doorsOpen = false;
         let atStation = false;
         let currentStation = null;
         let score = 0;
+        let boosterPurchased = false;
 
         const MASS = 50000; 
         const MAX_THROTTLE_FORCE = 80000; 
         const MAX_BRAKE_FORCE = 200000; 
         const FRICTION_COEFFICIENT = 150; 
         const GRAVITY = 9.81;
-        const MAX_SPEED = 33.3; // 120 km/h in m/s
+        let MAX_SPEED = 33.3; // 120 km/h in m/s
 
         // Strecken-Generierung
         const stations = [];
@@ -354,7 +361,8 @@
             brakeValue: document.getElementById('brake-value'),
             doorButton: document.getElementById('door-button'),
             statusMessage: document.getElementById('status-message'),
-            statsContainer: document.getElementById('stats')
+            statsContainer: document.getElementById('stats'),
+            boosterButton: document.getElementById('booster-button')
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
@@ -1103,20 +1111,20 @@
         // --- Steuerung ---
         function setupControls() {
             ui.throttleSlider.addEventListener('input', (e) => {
-                window.throttle = parseInt(e.target.value) / 100;
+                throttle = parseInt(e.target.value) / 100;
                 ui.throttleValue.innerText = `${e.target.value}%`;
-                if (window.throttle > 0) {
-                    window.brake = 0;
+                if (throttle > 0) {
+                    brake = 0;
                     ui.brakeSlider.value = 0;
                     ui.brakeValue.innerText = '0%';
                 }
             });
             
             ui.brakeSlider.addEventListener('input', (e) => {
-                window.brake = parseInt(e.target.value) / 100;
+                brake = parseInt(e.target.value) / 100;
                 ui.brakeValue.innerText = `${e.target.value}%`;
-                if (window.brake > 0) {
-                    window.throttle = 0;
+                if (brake > 0) {
+                    throttle = 0;
                     ui.throttleSlider.value = 0;
                     ui.throttleValue.innerText = '0%';
                 }
@@ -1124,14 +1132,23 @@
 
             ui.throttleSlider.addEventListener('mouseup', () => {
                 ui.throttleSlider.value = 0;
-                window.throttle = 0;
+                throttle = 0;
                 ui.throttleValue.innerText = '0%';
             });
             
             ui.doorButton.addEventListener('click', () => {
-                if (atStation && window.playerSpeed < 0.1) {
+                if (atStation && playerSpeed < 0.1) {
                     doorsOpen = !doorsOpen;
                     updateDoorButton();
+                }
+            });
+
+            ui.boosterButton.addEventListener('click', () => {
+                if (score >= 100 && !boosterPurchased) {
+                    score -= 100;
+                    boosterPurchased = true;
+                    MAX_SPEED = 55.6; // 200 km/h
+                    ui.boosterButton.classList.add('hidden');
                 }
             });
         }
@@ -1158,7 +1175,7 @@
         function updatePhysics(dt) {
             if (!trackCurve || dt === 0) return;
 
-            const oldSpeed = window.playerSpeed;
+            const oldSpeed = playerSpeed;
 
             // 1. Kräfte berechnen
             const t = playerDistance / totalTrackLength;
@@ -1166,14 +1183,14 @@
             const incline = tangent.y; 
 
             const gravityComponent = MASS * GRAVITY * incline; 
-            let throttleForce = window.throttle * MAX_THROTTLE_FORCE;
-            let brakeForce = window.brake * MAX_BRAKE_FORCE;
-            const frictionForce = window.playerSpeed * FRICTION_COEFFICIENT + window.playerSpeed * window.playerSpeed * 10;
+            let throttleForce = throttle * MAX_THROTTLE_FORCE;
+            let brakeForce = brake * MAX_BRAKE_FORCE;
+            const frictionForce = playerSpeed * FRICTION_COEFFICIENT + playerSpeed * playerSpeed * 10;
 
             if (doorsOpen) {
                 throttleForce = 0;
                 brakeForce = MAX_BRAKE_FORCE * 1.5; 
-                window.throttle = 0;
+                throttle = 0;
                 ui.throttleSlider.value = 0;
             }
 
@@ -1181,17 +1198,17 @@
             const calculatedAcceleration = totalForce / MASS;
             
             // 2. Geschwindigkeit und Distanz aktualisieren
-            window.playerSpeed += calculatedAcceleration * dt;
+            playerSpeed += calculatedAcceleration * dt;
 
             // Verhindern, dass der Zug rückwärts rollt
-            if (window.playerSpeed < 0 && window.throttle === 0 && window.brake === 0) {
-                 if (window.playerSpeed < -0.1 || window.brake > 0) window.playerSpeed = 0;
-            } else if (window.playerSpeed < 0) {
-                window.playerSpeed = 0;
+            if (playerSpeed < 0 && throttle === 0 && brake === 0) {
+                 if (playerSpeed < -0.1 || brake > 0) playerSpeed = 0;
+            } else if (playerSpeed < 0) {
+                playerSpeed = 0;
             }
-            if (window.playerSpeed > MAX_SPEED) window.playerSpeed = MAX_SPEED;
+            if (playerSpeed > MAX_SPEED) playerSpeed = MAX_SPEED;
             
-            playerDistance += window.playerSpeed * dt;
+            playerDistance += playerSpeed * dt;
 
             if (playerDistance > totalTrackLength) playerDistance -= totalTrackLength;
             if (playerDistance < 0) playerDistance += totalTrackLength;
@@ -1201,12 +1218,12 @@
                 const now = Tone.now();
                 const minEngineFreq = 80;
                 const maxEngineFreq = 400;
-                const speedRatio = window.playerSpeed / MAX_SPEED;
+                const speedRatio = playerSpeed / MAX_SPEED;
 
                 // Tatsächliche Beschleunigung berechnen
-                const actualAcceleration = (window.playerSpeed - oldSpeed) / dt;
+                const actualAcceleration = (playerSpeed - oldSpeed) / dt;
 
-                if (window.throttle > 0 && window.playerSpeed > 0.1) {
+                if (throttle > 0 && playerSpeed > 0.1) {
                     // Beschleunigen oder Geschwindigkeit halten
                     if (engineSound.state !== "started") {
                         engineSound.start(now);
@@ -1216,7 +1233,7 @@
                     engineSound.frequency.rampTo(targetFreq, 0.1);
 
                     // Lautstärke basierend auf Beschleunigung und Throttle
-                    const baseVolume = THREE.MathUtils.lerp(-40, -30, window.throttle);
+                    const baseVolume = THREE.MathUtils.lerp(-40, -30, throttle);
                     const accelerationFactor = THREE.MathUtils.clamp(actualAcceleration * 2.0, 0, 1);
                     lastAccelerationFactor = THREE.MathUtils.lerp(lastAccelerationFactor, accelerationFactor, 0.1);
                     const targetVolume = baseVolume + THREE.MathUtils.lerp(0, 15, lastAccelerationFactor);
@@ -1227,27 +1244,27 @@
                         brakeSound.triggerRelease(now);
                     }
 
-                } else if (window.brake > 0 && window.playerSpeed > 0.1) {
+                } else if (brake > 0 && playerSpeed > 0.1) {
                     // Bremsen
                     if (brakeSound.volume.value === -Infinity) {
                          brakeSound.triggerAttack(now);
                     }
-                    const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, window.brake * speedRatio);
+                    const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, brake * speedRatio);
                     brakeSound.volume.rampTo(targetBrakeVol, 0.05);
 
                     if (engineSound.state === "started") {
                          engineSound.volume.rampTo(-Infinity, 0.5, now);
-                         setTimeout(() => { if (window.brake > 0) engineSound.stop() }, 500);
+                         setTimeout(() => { if (brake > 0) engineSound.stop() }, 500);
                          lastAccelerationFactor = 0;
                     }
                 } else {
                     // Leerlauf oder Stillstand
                      if (engineSound.state === "started") {
-                         const idleVolume = (window.playerSpeed > 0.1) ? -40 : -Infinity;
+                         const idleVolume = (playerSpeed > 0.1) ? -40 : -Infinity;
                          engineSound.volume.rampTo(idleVolume, 0.5, now);
                          engineSound.frequency.rampTo(minEngineFreq + speedRatio * 20, 0.5);
-                         if (window.playerSpeed < 0.1) {
-                            setTimeout(() => { if(window.playerSpeed < 0.1 && window.throttle === 0 && window.brake === 0) engineSound.stop() }, 500);
+                         if (playerSpeed < 0.1) {
+                            setTimeout(() => { if(playerSpeed < 0.1 && throttle === 0 && brake === 0) engineSound.stop() }, 500);
                          }
                          lastAccelerationFactor = 0;
                      }
@@ -1328,7 +1345,7 @@
                 ui.nextStationName.innerText = currentStation.name;
                 ui.nextStationDistance.innerText = `STOP ${minDistanceToStop.toFixed(0)} m`;
                 
-                if (window.playerSpeed < 0.1) {
+                if (playerSpeed < 0.1) {
                     if (currentStation && !currentStation.visited) {
                         score += 100;
                         currentStation.visited = true;
@@ -1371,12 +1388,18 @@
         
         // --- UI-Updates ---
         function updateUI() {
-            ui.speedDisplay.innerText = (window.playerSpeed * 3.6).toFixed(0);
+            ui.speedDisplay.innerText = (playerSpeed * 3.6).toFixed(0);
             ui.scoreDisplay.innerText = score;
+
+            if (score >= 100 && !boosterPurchased) {
+                ui.boosterButton.classList.remove('hidden');
+            } else {
+                ui.boosterButton.classList.add('hidden');
+            }
         }
         
         function updateDoorButton() {
-            const canOpen = atStation && window.playerSpeed < 0.1;
+            const canOpen = atStation && playerSpeed < 0.1;
             const buttonDiv = ui.doorButton.children[0];
             
             if (doorsOpen) {
