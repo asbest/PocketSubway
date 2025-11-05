@@ -326,6 +326,7 @@
         let doorsOpen = false;
         let atStation = false;
         let currentStation = null;
+        let previousStation = null;
         window.score = 0;
         let boosterPurchased = false;
 
@@ -1355,8 +1356,8 @@
             });
 
             ui.boosterButton.addEventListener('click', () => {
-                if (score >= 100 && !boosterPurchased) {
-                    score -= 100;
+                if (window.score >= 100 && !boosterPurchased) {
+                    window.score -= 100;
                     boosterPurchased = true;
                     MAX_SPEED = 55.6; // 200 km/h
                     ui.boosterButton.classList.add('hidden');
@@ -1559,7 +1560,7 @@
                 
                 if (window.playerSpeed < 0.1) {
                     if (currentStation && !currentStation.visited) {
-                        score += 100;
+                        window.score += 100;
                         currentStation.visited = true;
 
                         const stationName = currentStation.name;
@@ -1572,33 +1573,57 @@
                         setTimeout(() => {
                             if (ui.statusMessage.dataset.station === stationName) {
                                 ui.statusMessage.classList.add('hidden');
+                                delete ui.statusMessage.dataset.station;
                             }
                         }, 5000);
 
                     } else if (!wasAtStation) {
-                        delete ui.statusMessage.dataset.station;
-                        ui.statusMessage.innerText = `Haltestelle: ${currentStation.name}`;
-                        ui.statusMessage.classList.remove('hidden', 'bg-green-500');
-                        ui.statusMessage.classList.add('bg-blue-600');
+                        // Zeige eine temporäre "Ankunft"-Nachricht an, wenn keine andere wichtige Nachricht angezeigt wird
+                        if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
+                             delete ui.statusMessage.dataset.station; // Vorsichtshalber löschen
+                             ui.statusMessage.innerText = `Haltestelle: ${currentStation.name}`;
+                             ui.statusMessage.classList.remove('hidden', 'bg-green-500', 'bg-red-500');
+                             ui.statusMessage.classList.add('bg-blue-600');
+                        }
                     }
                 } else {
-                    if (!ui.statusMessage.dataset.signal) {
-                        delete ui.statusMessage.dataset.station;
+                    // Verstecke die Nachricht nur, wenn keine wichtige, zeitgesteuerte Nachricht aktiv ist
+                    if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
                         ui.statusMessage.classList.add('hidden');
                     }
                 }
 
             } else {
-                 if (!ui.statusMessage.dataset.signal) {
-                    delete ui.statusMessage.dataset.station;
-                    ui.statusMessage.classList.add('hidden');
+                // Logik für das Verlassen einer Station
+                if (wasAtStation && previousStation && !previousStation.visited) {
+                    window.score -= 100;
+
+                    const stationName = previousStation.name;
+                    ui.statusMessage.dataset.station = stationName;
+                    ui.statusMessage.innerText = `Station ${stationName} verpasst! -100 Punkte`;
+                    ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
+                    ui.statusMessage.classList.add('bg-red-500');
+
+                    setTimeout(() => {
+                        if (ui.statusMessage.dataset.station === stationName) {
+                            ui.statusMessage.classList.add('hidden');
+                            delete ui.statusMessage.dataset.station;
+                        }
+                    }, 5000);
+                } else {
+                    // Verstecke die Nachricht nur, wenn keine wichtige, zeitgesteuerte Nachricht aktiv ist
+                    if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
+                       ui.statusMessage.classList.add('hidden');
+                    }
                 }
+
                 if (nextStation) {
                     ui.nextStationName.innerText = nextStation.name;
                     ui.nextStationDistance.innerText = `${minDistanceToNext.toFixed(0)} m`;
                 }
             }
 
+            previousStation = currentStation;
             updateDoorButton();
         }
 
@@ -1630,6 +1655,7 @@
                             setTimeout(() => {
                                 if (ui.statusMessage.dataset.signal === signalId) {
                                     ui.statusMessage.classList.add('hidden');
+                                    delete ui.statusMessage.dataset.signal;
                                 }
                             }, 5000);
                         }
