@@ -339,6 +339,7 @@
         // Strecken-Generierung
         const stations = [];
         const signals = [];
+        window.signals = signals; // Exposed for verification
         const NUM_SEGMENTS = 50;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
@@ -367,7 +368,7 @@
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
-        let tunnelMaterial, railMaterial, tieMaterial, cableMaterial;
+        let tunnelMaterial, railMaterial, tieMaterial, cableMaterial, trackbedMaterial;
         let stationWallMaterial, stationFloorMaterial;
         let signalMastMaterial, signalLightRedMaterial, signalLightGreenMaterial, signalBoxRedMaterial, signalBoxGreenMaterial;
         
@@ -592,6 +593,23 @@
                 color: 0x008800, // Dunkelgrün
                 roughness: 0.6,
                 metalness: 0.1
+            });
+
+            // Gleisbett (Beton) Material
+            const trackbedTexture = generateNoiseTexture(256, 256, {
+                scale: 80,
+                octaves: 4,
+                persistence: 0.3,
+                lacunarity: 2.5,
+                color1: 0x888888,
+                color2: 0x666666
+            });
+            trackbedTexture.wrapS = THREE.RepeatWrapping;
+            trackbedTexture.wrapT = THREE.RepeatWrapping;
+            trackbedMaterial = new THREE.MeshStandardMaterial({
+                map: trackbedTexture,
+                roughness: 0.85,
+                metalness: 0.0
             });
         }
 
@@ -860,6 +878,27 @@
             }
             tieMesh.instanceMatrix.needsUpdate = true;
             scene.add(tieMesh);
+
+            // 5. Gleisbett
+            const trackbedGeo = new THREE.BoxGeometry(3.0, 0.2, 1.5);
+            const trackbedMesh = new THREE.InstancedMesh(trackbedGeo, trackbedMaterial, tieCount); // Gleiche Anzahl wie Schwellen
+
+            for (let i = 0; i < tieCount; i++) {
+                const t = (i / tieCount);
+                const t_next = (i + 1) / tieCount;
+
+                curve.getPointAt(t, dummy.position);
+                curve.getPointAt(t_next, lookAtPos);
+
+                // Gleisbett liegt unter den Schwellen
+                dummy.position.y -= 0.25;
+
+                dummy.lookAt(lookAtPos);
+                dummy.updateMatrix();
+                trackbedMesh.setMatrixAt(i, dummy.matrix);
+            }
+            trackbedMesh.instanceMatrix.needsUpdate = true;
+            scene.add(trackbedMesh);
         }
 
         function createTunnelArches(curve, tunnelOffsetY) {
@@ -1579,7 +1618,7 @@
                     // Fall 1: Spieler hält korrekt vor dem roten Signal an
                     if (distToSignal > 0 && distToSignal < 30) {
                         if (window.playerSpeed < 0.1) {
-                            score += 100;
+                            window.score += 100;
                             signal.pointsAwarded = true; // Verhindert doppelte Punkte/Strafen
 
                             const signalId = `signal-${signal.distance}`;
@@ -1597,7 +1636,7 @@
                     }
                     // Fall 2: Spieler überfährt das rote Signal (in einem kleinen Fenster direkt dahinter)
                     else if (distToSignal < 0 && distToSignal > -5) {
-                        score -= 100;
+                        window.score -= 100;
                         signal.pointsAwarded = true; // Verhindert weitere Strafen für dieses Signal
 
                         const signalId = `signal-${signal.distance}`;
