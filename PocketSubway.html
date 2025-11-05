@@ -1206,14 +1206,14 @@
                     if (redLightBoxMesh) {
                         dummy.position.copy(lightBoxPos);
                         // WICHTIG: Zuerst die 'up'-Richtung festlegen, dann 'lookAt' aufrufen.
-                        // Dies stellt sicher, dass die Box korrekt ausgerichtet ist und bündig mit dem Mast abschließt.
+                        // Korrektur: .sub(tangent), damit das Signal dem Spieler zugewandt ist.
                         dummy.up.copy(normal);
-                        dummy.lookAt(lightBoxPos.clone().add(tangent));
+                        dummy.lookAt(lightBoxPos.clone().sub(tangent));
                         dummy.updateMatrix();
                         redLightBoxMesh.setMatrixAt(redIndex, dummy.matrix);
                     }
                     if (redLightMesh) {
-                        const lightPos = lightBoxPos.clone().addScaledVector(tangent, -0.2);
+                        const lightPos = lightBoxPos.clone().addScaledVector(tangent.negate(), 0.2); // Nach vorne (negierte Tangente)
                         dummy.position.copy(lightPos);
                         dummy.updateMatrix();
                         redLightMesh.setMatrixAt(redIndex, dummy.matrix);
@@ -1224,12 +1224,12 @@
                         dummy.position.copy(lightBoxPos);
                         // WICHTIG: Zuerst die 'up'-Richtung festlegen, dann 'lookAt' aufrufen.
                         dummy.up.copy(normal);
-                        dummy.lookAt(lightBoxPos.clone().add(tangent));
+                        dummy.lookAt(lightBoxPos.clone().sub(tangent));
                         dummy.updateMatrix();
                         greenLightBoxMesh.setMatrixAt(greenIndex, dummy.matrix);
                     }
                     if (greenLightMesh) {
-                        const lightPos = lightBoxPos.clone().addScaledVector(tangent, -0.2);
+                        const lightPos = lightBoxPos.clone().addScaledVector(tangent.negate(), 0.2); // Nach vorne (negierte Tangente)
                         dummy.position.copy(lightPos);
                         dummy.updateMatrix();
                         greenLightMesh.setMatrixAt(greenIndex, dummy.matrix);
