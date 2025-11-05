@@ -338,6 +338,7 @@
 
         // Strecken-Generierung
         const stations = [];
+        const signals = [];
         const NUM_SEGMENTS = 10;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
@@ -368,6 +369,7 @@
         // Materialien für prozedurale Texturen (generiert bei Init)
         let tunnelMaterial, railMaterial, tieMaterial, cableMaterial;
         let stationWallMaterial, stationFloorMaterial;
+        let signalMastMaterial, signalLightRedMaterial, signalLightGreenMaterial;
         
         // --- Initialisierung ---
         function init() {
@@ -564,6 +566,23 @@
                 roughness: 0.6,
                 metalness: 0.05
             });
+
+            // Signal Materialien
+            signalMastMaterial = new THREE.MeshStandardMaterial({
+                color: 0x555555,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            signalLightRedMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                emissive: 0xff0000,
+                emissiveIntensity: 1
+            });
+            signalLightGreenMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00ff00,
+                emissive: 0x00ff00,
+                emissiveIntensity: 1
+            });
         }
 
 
@@ -647,6 +666,7 @@
             }
             
             let lastWasStation = true; 
+            let nextSignalDistance = 1000 + Math.random() * 1000;
 
             // --- 3. Restliche Strecke prozedural generieren ---
             for (let i = 1; i < NUM_SEGMENTS; i++) { 
@@ -694,6 +714,28 @@
                     currentPos.add(currentDir);
                     points.push(currentPos.clone());
                     totalTrackLength++;
+
+                    // --- Signal Platzierung ---
+                    if (totalTrackLength >= nextSignalDistance) {
+                        let inStation = false;
+                        for (const station of stations) {
+                            if (totalTrackLength > station.distance - station.length / 2 &&
+                                totalTrackLength < station.distance + station.length / 2) {
+                                inStation = true;
+                                break;
+                            }
+                        }
+
+                        if (!inStation) {
+                            const color = Math.random() < 0.5 ? 'red' : 'green';
+                            signals.push({
+                                distance: totalTrackLength,
+                                color: color,
+                                pointsAwarded: false
+                            });
+                            nextSignalDistance = totalTrackLength + 1000 + Math.random() * 1000;
+                        }
+                    }
                 }
             }
 
@@ -707,6 +749,9 @@
             
             // Bahnhöfe erstellen
             createStations(trackCurve);
+
+            // Signale erstellen
+            createSignals(trackCurve);
 
             // Passe die Wiederholung der Ziegeltextur an die tatsächliche Streckenlänge an
             const tunnelCircumference = 2 * Math.PI * 5.0; // tunnelRadius = 5.0
@@ -1088,6 +1133,94 @@
                 }
             });
         }
+
+        function createSignals(curve) {
+            if (signals.length === 0) return;
+
+            const mastGeo = new THREE.CylinderGeometry(0.1, 0.15, 4, 8);
+            const lightBoxGeo = new THREE.BoxGeometry(0.4, 0.8, 0.4);
+            const lightGeo = new THREE.SphereGeometry(0.15, 16, 16);
+
+            const mastMesh = new THREE.InstancedMesh(mastGeo, signalMastMaterial, signals.length);
+            const lightBoxMesh = new THREE.InstancedMesh(lightBoxGeo, signalMastMaterial, signals.length);
+
+            const redSignals = signals.filter(s => s.color === 'red');
+            const greenSignals = signals.filter(s => s.color === 'green');
+
+            const redLightMesh = redSignals.length > 0 ? new THREE.InstancedMesh(lightGeo, signalLightRedMaterial, redSignals.length) : null;
+            const greenLightMesh = greenSignals.length > 0 ? new THREE.InstancedMesh(lightGeo, signalLightGreenMaterial, greenSignals.length) : null;
+
+            const dummy = new THREE.Object3D();
+            const pos = new THREE.Vector3();
+            const tangent = new THREE.Vector3();
+            const up = new THREE.Vector3(0, 1, 0);
+            const binormal = new THREE.Vector3();
+            const normal = new THREE.Vector3();
+
+            let redIndex = 0;
+            let greenIndex = 0;
+
+            signals.forEach((signal, i) => {
+                const t = signal.distance / totalTrackLength;
+                curve.getPointAt(t, pos);
+                curve.getTangentAt(t, tangent);
+
+                binormal.crossVectors(up, tangent).normalize();
+                normal.crossVectors(tangent, binormal).normalize();
+
+                const signalSideOffset = 2.5; // Rechts von der Strecke
+
+                // --- Mast und Lichtkasten ---
+                const mastBasePos = pos.clone().addScaledVector(binormal, signalSideOffset);
+                const mastTopPos = mastBasePos.clone().addScaledVector(normal, 4.0);
+
+                dummy.position.copy(mastBasePos);
+                dummy.up.copy(normal);
+                dummy.lookAt(mastTopPos.clone().add(tangent));
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                mastMesh.setMatrixAt(i, dummy.matrix);
+
+                const lightBoxPos = mastBasePos.clone().addScaledVector(normal, 3.5);
+                dummy.position.copy(lightBoxPos);
+                dummy.lookAt(lightBoxPos.clone().add(tangent));
+                dummy.up.copy(normal);
+                dummy.updateMatrix();
+                lightBoxMesh.setMatrixAt(i, dummy.matrix);
+
+                // --- Lichter ---
+                if (signal.color === 'red') {
+                    if (redLightMesh) {
+                        const lightPos = lightBoxPos.clone().addScaledVector(normal, 0.2); // Oben
+                        dummy.position.copy(lightPos);
+                        dummy.updateMatrix();
+                        redLightMesh.setMatrixAt(redIndex++, dummy.matrix);
+                    }
+                } else { // green
+                    if (greenLightMesh) {
+                        const lightPos = lightBoxPos.clone().addScaledVector(normal, -0.2); // Unten
+                        dummy.position.copy(lightPos);
+                        dummy.updateMatrix();
+                        greenLightMesh.setMatrixAt(greenIndex++, dummy.matrix);
+                    }
+                }
+            });
+
+            mastMesh.instanceMatrix.needsUpdate = true;
+            scene.add(mastMesh);
+
+            lightBoxMesh.instanceMatrix.needsUpdate = true;
+            scene.add(lightBoxMesh);
+
+            if (redLightMesh) {
+                redLightMesh.instanceMatrix.needsUpdate = true;
+                scene.add(redLightMesh);
+            }
+            if (greenLightMesh) {
+                greenLightMesh.instanceMatrix.needsUpdate = true;
+                scene.add(greenLightMesh);
+            }
+        }
         
         // --- Cockpit Erstellung ---
         function createDriverCab() {
@@ -1164,6 +1297,7 @@
             updatePhysics(dt);
             updateCameraPosition();
             checkStationStatus();
+            checkSignalStatus();
             updateUI();
 
             renderer.render(scene, camera);
@@ -1385,6 +1519,37 @@
             }
 
             updateDoorButton();
+        }
+
+        function checkSignalStatus() {
+            for (const signal of signals) {
+                if (signal.color === 'red' && !signal.pointsAwarded) {
+                    const distToSignal = signal.distance - playerDistance;
+
+                    // Prüfen, ob der Zug im Bereich von 5m vor dem Signal steht
+                    if (distToSignal > 0 && distToSignal < 5) {
+                        if (window.playerSpeed < 0.1) {
+                            score += 100;
+                            signal.pointsAwarded = true; // Verhindert doppelte Punkte
+
+                            // UI-Nachricht anzeigen
+                            const signalId = `signal-${signal.distance}`;
+                            ui.statusMessage.dataset.signal = signalId;
+                            ui.statusMessage.innerText = `An rotem Signal gehalten! +100 Punkte`;
+                            ui.statusMessage.classList.remove('hidden', 'bg-blue-600');
+                            ui.statusMessage.classList.add('bg-green-500');
+
+                            // Nachricht nach 5 Sekunden ausblenden
+                            setTimeout(() => {
+                                // Nur ausblenden, wenn sich die Nachricht nicht geändert hat
+                                if (ui.statusMessage.dataset.signal === signalId) {
+                                    ui.statusMessage.classList.add('hidden');
+                                }
+                            }, 5000);
+                        }
+                    }
+                }
+            }
         }
         
         // --- UI-Updates ---
