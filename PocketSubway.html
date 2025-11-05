@@ -313,7 +313,7 @@
         let driverCab; 
         let trackCurve; 
         let totalTrackLength = 0;
-        let playerDistance = 0; 
+        window.playerDistance = 0;
         window.playerSpeed = 0;
 
         // Sound Variablen
@@ -326,7 +326,7 @@
         let doorsOpen = false;
         let atStation = false;
         let currentStation = null;
-        let score = 0;
+        window.score = 0;
         let boosterPurchased = false;
 
         const MASS = 50000; 
@@ -1147,7 +1147,8 @@
         function createSignals(curve) {
             if (signals.length === 0) return;
 
-            const mastGeo = new THREE.CylinderGeometry(0.1, 0.15, 4, 8);
+            const mastHeight = 3.6; // Höhe von Tunnelboden (-0.5) bis Unterkante Signalkasten (3.1)
+            const mastGeo = new THREE.CylinderGeometry(0.1, 0.15, mastHeight, 8);
             const lightBoxGeo = new THREE.BoxGeometry(0.4, 0.8, 0.4);
             const lightGeo = new THREE.SphereGeometry(0.15, 16, 16);
 
@@ -1183,11 +1184,15 @@
 
                 // --- Mast und Lichtkasten ---
                 const mastBasePos = pos.clone().addScaledVector(binormal, signalSideOffset);
-                const mastTopPos = mastBasePos.clone().addScaledVector(normal, 4.0);
 
-                dummy.position.copy(mastBasePos);
+                // Mast-Positionierung: Der Mast (Höhe 3.6m) soll von ca. y=-0.5 bis y=3.1 reichen.
+                // Der Mittelpunkt des Masts muss daher bei y = (-0.5 + 3.1) / 2 = 1.3 liegen.
+                const mastCenterPos = mastBasePos.clone().addScaledVector(normal, 1.3);
+                const mastTopForLookat = mastCenterPos.clone().addScaledVector(normal, mastHeight / 2); // Oben am Mast
+
+                dummy.position.copy(mastCenterPos);
                 dummy.up.copy(normal);
-                dummy.lookAt(mastTopPos.clone().add(tangent));
+                dummy.lookAt(mastTopForLookat.clone().add(tangent));
                 dummy.scale.set(1, 1, 1);
                 dummy.updateMatrix();
                 mastMesh.setMatrixAt(i, dummy.matrix);
@@ -1554,8 +1559,8 @@
                 if (signal.color === 'red' && !signal.pointsAwarded) {
                     const distToSignal = signal.distance - playerDistance;
 
-                    // Prüfen, ob der Zug im Bereich von 5m vor dem Signal steht
-                    if (distToSignal > 0 && distToSignal < 5) {
+                    // Prüfen, ob der Zug im Bereich von 30m vor dem Signal steht
+                    if (distToSignal > 0 && distToSignal < 30) {
                         if (window.playerSpeed < 0.1) {
                             score += 100;
                             signal.pointsAwarded = true; // Verhindert doppelte Punkte
