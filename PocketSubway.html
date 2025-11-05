@@ -369,7 +369,7 @@
         // Materialien für prozedurale Texturen (generiert bei Init)
         let tunnelMaterial, railMaterial, tieMaterial, cableMaterial;
         let stationWallMaterial, stationFloorMaterial;
-        let signalMastMaterial, signalLightRedMaterial, signalLightGreenMaterial;
+        let signalMastMaterial, signalLightRedMaterial, signalLightGreenMaterial, signalBoxRedMaterial, signalBoxGreenMaterial;
         
         // --- Initialisierung ---
         function init() {
@@ -582,6 +582,16 @@
                 color: 0x00ff00,
                 emissive: 0x00ff00,
                 emissiveIntensity: 1
+            });
+            signalBoxRedMaterial = new THREE.MeshStandardMaterial({
+                color: 0x880000, // Dunkelrot
+                roughness: 0.6,
+                metalness: 0.1
+            });
+            signalBoxGreenMaterial = new THREE.MeshStandardMaterial({
+                color: 0x008800, // Dunkelgrün
+                roughness: 0.6,
+                metalness: 0.1
             });
         }
 
@@ -1142,11 +1152,12 @@
             const lightGeo = new THREE.SphereGeometry(0.15, 16, 16);
 
             const mastMesh = new THREE.InstancedMesh(mastGeo, signalMastMaterial, signals.length);
-            const lightBoxMesh = new THREE.InstancedMesh(lightBoxGeo, signalMastMaterial, signals.length);
 
             const redSignals = signals.filter(s => s.color === 'red');
             const greenSignals = signals.filter(s => s.color === 'green');
 
+            const redLightBoxMesh = redSignals.length > 0 ? new THREE.InstancedMesh(lightBoxGeo, signalBoxRedMaterial, redSignals.length) : null;
+            const greenLightBoxMesh = greenSignals.length > 0 ? new THREE.InstancedMesh(lightBoxGeo, signalBoxGreenMaterial, greenSignals.length) : null;
             const redLightMesh = redSignals.length > 0 ? new THREE.InstancedMesh(lightGeo, signalLightRedMaterial, redSignals.length) : null;
             const greenLightMesh = greenSignals.length > 0 ? new THREE.InstancedMesh(lightGeo, signalLightGreenMaterial, greenSignals.length) : null;
 
@@ -1168,7 +1179,7 @@
                 binormal.crossVectors(up, tangent).normalize();
                 normal.crossVectors(tangent, binormal).normalize();
 
-                const signalSideOffset = 2.5; // Rechts von der Strecke
+                const signalSideOffset = -2.5; // Rechts von der Strecke (negativer Wert für rechts)
 
                 // --- Mast und Lichtkasten ---
                 const mastBasePos = pos.clone().addScaledVector(binormal, signalSideOffset);
@@ -1182,35 +1193,52 @@
                 mastMesh.setMatrixAt(i, dummy.matrix);
 
                 const lightBoxPos = mastBasePos.clone().addScaledVector(normal, 3.5);
-                dummy.position.copy(lightBoxPos);
-                dummy.lookAt(lightBoxPos.clone().add(tangent));
-                dummy.up.copy(normal);
-                dummy.updateMatrix();
-                lightBoxMesh.setMatrixAt(i, dummy.matrix);
 
-                // --- Lichter ---
+                // --- Lichter & Farbige Boxen ---
                 if (signal.color === 'red') {
+                    if (redLightBoxMesh) {
+                        dummy.position.copy(lightBoxPos);
+                        dummy.lookAt(lightBoxPos.clone().add(tangent));
+                        dummy.up.copy(normal);
+                        dummy.updateMatrix();
+                        redLightBoxMesh.setMatrixAt(redIndex, dummy.matrix);
+                    }
                     if (redLightMesh) {
-                        const lightPos = lightBoxPos.clone().addScaledVector(normal, 0.2); // Oben
+                        const lightPos = lightBoxPos.clone().addScaledVector(tangent, -0.2);
                         dummy.position.copy(lightPos);
                         dummy.updateMatrix();
-                        redLightMesh.setMatrixAt(redIndex++, dummy.matrix);
+                        redLightMesh.setMatrixAt(redIndex, dummy.matrix);
                     }
+                    redIndex++;
                 } else { // green
+                    if (greenLightBoxMesh) {
+                        dummy.position.copy(lightBoxPos);
+                        dummy.lookAt(lightBoxPos.clone().add(tangent));
+                        dummy.up.copy(normal);
+                        dummy.updateMatrix();
+                        greenLightBoxMesh.setMatrixAt(greenIndex, dummy.matrix);
+                    }
                     if (greenLightMesh) {
-                        const lightPos = lightBoxPos.clone().addScaledVector(normal, -0.2); // Unten
+                        const lightPos = lightBoxPos.clone().addScaledVector(tangent, -0.2);
                         dummy.position.copy(lightPos);
                         dummy.updateMatrix();
-                        greenLightMesh.setMatrixAt(greenIndex++, dummy.matrix);
+                        greenLightMesh.setMatrixAt(greenIndex, dummy.matrix);
                     }
+                    greenIndex++;
                 }
             });
 
             mastMesh.instanceMatrix.needsUpdate = true;
             scene.add(mastMesh);
 
-            lightBoxMesh.instanceMatrix.needsUpdate = true;
-            scene.add(lightBoxMesh);
+            if (redLightBoxMesh) {
+                redLightBoxMesh.instanceMatrix.needsUpdate = true;
+                scene.add(redLightBoxMesh);
+            }
+            if (greenLightBoxMesh) {
+                greenLightBoxMesh.instanceMatrix.needsUpdate = true;
+                scene.add(greenLightBoxMesh);
+            }
 
             if (redLightMesh) {
                 redLightMesh.instanceMatrix.needsUpdate = true;
