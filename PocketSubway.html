@@ -1188,11 +1188,13 @@
                 // Mast-Positionierung: Der Mast (Höhe 3.6m) soll von ca. y=-0.5 bis y=3.1 reichen.
                 // Der Mittelpunkt des Masts muss daher bei y = (-0.5 + 3.1) / 2 = 1.3 liegen.
                 const mastCenterPos = mastBasePos.clone().addScaledVector(normal, 1.3);
-                const mastTopForLookat = mastCenterPos.clone().addScaledVector(normal, mastHeight / 2); // Oben am Mast
 
                 dummy.position.copy(mastCenterPos);
                 dummy.up.copy(normal);
-                dummy.lookAt(mastTopForLookat.clone().add(tangent));
+                // Richte den Mast so aus, dass er "nach vorne" (entlang der Tangente) schaut,
+                // während seine "Oberseite" (die Y-Achse des Zylinders) entlang der Normale des Gleises verläuft.
+                // Dies stellt sicher, dass der Mast senkrecht zum Gleisbett steht.
+                dummy.lookAt(mastCenterPos.clone().add(tangent));
                 dummy.scale.set(1, 1, 1);
                 dummy.updateMatrix();
                 mastMesh.setMatrixAt(i, dummy.matrix);
@@ -1203,8 +1205,10 @@
                 if (signal.color === 'red') {
                     if (redLightBoxMesh) {
                         dummy.position.copy(lightBoxPos);
-                        dummy.lookAt(lightBoxPos.clone().add(tangent));
+                        // WICHTIG: Zuerst die 'up'-Richtung festlegen, dann 'lookAt' aufrufen.
+                        // Dies stellt sicher, dass die Box korrekt ausgerichtet ist und bündig mit dem Mast abschließt.
                         dummy.up.copy(normal);
+                        dummy.lookAt(lightBoxPos.clone().add(tangent));
                         dummy.updateMatrix();
                         redLightBoxMesh.setMatrixAt(redIndex, dummy.matrix);
                     }
@@ -1218,8 +1222,9 @@
                 } else { // green
                     if (greenLightBoxMesh) {
                         dummy.position.copy(lightBoxPos);
-                        dummy.lookAt(lightBoxPos.clone().add(tangent));
+                        // WICHTIG: Zuerst die 'up'-Richtung festlegen, dann 'lookAt' aufrufen.
                         dummy.up.copy(normal);
+                        dummy.lookAt(lightBoxPos.clone().add(tangent));
                         dummy.updateMatrix();
                         greenLightBoxMesh.setMatrixAt(greenIndex, dummy.matrix);
                     }
