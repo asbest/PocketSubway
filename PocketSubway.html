@@ -1334,8 +1334,8 @@
 
             updatePhysics(dt);
             updateCameraPosition();
-            checkStationStatus();
             checkSignalStatus();
+            checkStationStatus();
             updateUI();
 
             renderer.render(scene, camera);
@@ -1543,13 +1543,17 @@
                         ui.statusMessage.classList.add('bg-blue-600');
                     }
                 } else {
-                    delete ui.statusMessage.dataset.station;
-                    ui.statusMessage.classList.add('hidden');
+                    if (!ui.statusMessage.dataset.signal) {
+                        delete ui.statusMessage.dataset.station;
+                        ui.statusMessage.classList.add('hidden');
+                    }
                 }
 
             } else {
-                delete ui.statusMessage.dataset.station;
-                ui.statusMessage.classList.add('hidden');
+                 if (!ui.statusMessage.dataset.signal) {
+                    delete ui.statusMessage.dataset.station;
+                    ui.statusMessage.classList.add('hidden');
+                }
                 if (nextStation) {
                     ui.nextStationName.innerText = nextStation.name;
                     ui.nextStationDistance.innerText = `${minDistanceToNext.toFixed(0)} m`;
@@ -1562,29 +1566,52 @@
         function checkSignalStatus() {
             for (const signal of signals) {
                 if (signal.color === 'red' && !signal.pointsAwarded) {
-                    const distToSignal = signal.distance - playerDistance;
+                    // Robuste Distanzberechnung mit Schleifenlogik
+                    let distToSignal = signal.distance - playerDistance;
+                    if (totalTrackLength > 0 && Math.abs(distToSignal) > totalTrackLength / 2) {
+                        if (distToSignal > 0) {
+                            distToSignal -= totalTrackLength;
+                        } else {
+                            distToSignal += totalTrackLength;
+                        }
+                    }
 
-                    // Prüfen, ob der Zug im Bereich von 30m vor dem Signal steht
+                    // Fall 1: Spieler hält korrekt vor dem roten Signal an
                     if (distToSignal > 0 && distToSignal < 30) {
                         if (window.playerSpeed < 0.1) {
                             score += 100;
-                            signal.pointsAwarded = true; // Verhindert doppelte Punkte
+                            signal.pointsAwarded = true; // Verhindert doppelte Punkte/Strafen
 
-                            // UI-Nachricht anzeigen
                             const signalId = `signal-${signal.distance}`;
                             ui.statusMessage.dataset.signal = signalId;
                             ui.statusMessage.innerText = `An rotem Signal gehalten! +100 Punkte`;
-                            ui.statusMessage.classList.remove('hidden', 'bg-blue-600');
+                            ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-red-500');
                             ui.statusMessage.classList.add('bg-green-500');
 
-                            // Nachricht nach 5 Sekunden ausblenden
                             setTimeout(() => {
-                                // Nur ausblenden, wenn sich die Nachricht nicht geändert hat
                                 if (ui.statusMessage.dataset.signal === signalId) {
                                     ui.statusMessage.classList.add('hidden');
                                 }
                             }, 5000);
                         }
+                    }
+                    // Fall 2: Spieler überfährt das rote Signal (in einem kleinen Fenster direkt dahinter)
+                    else if (distToSignal < 0 && distToSignal > -5) {
+                        score -= 100;
+                        signal.pointsAwarded = true; // Verhindert weitere Strafen für dieses Signal
+
+                        const signalId = `signal-${signal.distance}`;
+                        ui.statusMessage.dataset.signal = signalId;
+                        ui.statusMessage.innerText = `Rotes Signal überfahren! -100 Punkte`;
+                        ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
+                        ui.statusMessage.classList.add('bg-red-500');
+
+                        setTimeout(() => {
+                            if (ui.statusMessage.dataset.signal === signalId) {
+                                ui.statusMessage.classList.add('hidden');
+                                delete ui.statusMessage.dataset.signal;
+                            }
+                        }, 5000);
                     }
                 }
             }
