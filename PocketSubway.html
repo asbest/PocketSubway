@@ -1253,6 +1253,14 @@
                 const lightBoxPos = mastBasePos.clone().addScaledVector(normal, 3.5);
                 const lightPos = lightBoxPos.clone().addScaledVector(tangent.clone().negate(), 0.2);
 
+                // Store transform data for later updates
+                signal.transform = {
+                    lightBoxPos: lightBoxPos.clone(),
+                    lightPos: lightPos.clone(),
+                    up: normal.clone(),
+                    lookAt: lightBoxPos.clone().sub(tangent)
+                };
+
                 dummy.position.copy(lightBoxPos);
                 dummy.up.copy(normal);
                 dummy.lookAt(lightBoxPos.clone().sub(tangent));
@@ -1296,42 +1304,35 @@
 
         function updateSignalVisuals(signal) {
             const index = signal.meshIndex;
-            if (index === undefined) return;
+            if (index === undefined || !signal.transform) return;
 
             const isRed = signal.color === 'red';
             const dummy = new THREE.Object3D();
-            const matrix = new THREE.Matrix4();
+            const { lightBoxPos, lightPos, up, lookAt } = signal.transform;
 
-            // Rotes Licht und Gehäuse aktualisieren
-            // 1. Roter Kasten
-            redLightBoxMesh.getMatrixAt(index, matrix);
-            dummy.applyMatrix4(matrix);
+            // --- Rote Komponenten ---
+            dummy.position.copy(lightBoxPos);
+            dummy.up.copy(up);
+            dummy.lookAt(lookAt);
             dummy.scale.set(isRed ? 1 : 0, isRed ? 1 : 0, isRed ? 1 : 0);
             dummy.updateMatrix();
             redLightBoxMesh.setMatrixAt(index, dummy.matrix);
 
-            // 2. Rotes Licht
-            redLightMesh.getMatrixAt(index, matrix);
-            dummy.applyMatrix4(matrix);
-            dummy.scale.set(isRed ? 1 : 0, isRed ? 1 : 0, isRed ? 1 : 0);
+            dummy.position.copy(lightPos); // Nur Position für das Licht ändern
             dummy.updateMatrix();
             redLightMesh.setMatrixAt(index, dummy.matrix);
 
-            // Grünes Licht und Gehäuse aktualisieren
-            // 1. Grüner Kasten
-            greenLightBoxMesh.getMatrixAt(index, matrix);
-            dummy.applyMatrix4(matrix);
+            // --- Grüne Komponenten ---
+            dummy.position.copy(lightBoxPos);
+            dummy.up.copy(up);
+            dummy.lookAt(lookAt);
             dummy.scale.set(isRed ? 0 : 1, isRed ? 0 : 1, isRed ? 0 : 1);
             dummy.updateMatrix();
             greenLightBoxMesh.setMatrixAt(index, dummy.matrix);
 
-            // 2. Grünes Licht
-            greenLightMesh.getMatrixAt(index, matrix);
-            dummy.applyMatrix4(matrix);
-            dummy.scale.set(isRed ? 0 : 1, isRed ? 0 : 1, isRed ? 0 : 1);
+            dummy.position.copy(lightPos); // Nur Position für das Licht ändern
             dummy.updateMatrix();
             greenLightMesh.setMatrixAt(index, dummy.matrix);
-
 
             // Wichtig: Die .needsUpdate Flags setzen
             redLightBoxMesh.instanceMatrix.needsUpdate = true;
