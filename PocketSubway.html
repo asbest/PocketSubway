@@ -1754,9 +1754,9 @@
                         }
                     }
                     // Fall 2: Spieler überfährt das rote Signal deutlich
-                    // Eine zusätzliche Prüfung (playerDistance > 100) verhindert eine fälschliche Strafe direkt am Start (0m),
-                    // die durch die "wrap-around"-Distanzberechnung für weit entfernte Signale ausgelöst werden kann.
-                    else if (distToSignal < -5 && window.playerSpeed > 0.5 && window.playerDistance > 100) { // Nur bestrafen, wenn man sich noch bewegt
+                    // Die zusätzliche Bedingung (distToSignal > -50) verhindert eine fälschliche Strafe für weit entfernte
+                    // Signale, die durch die "wrap-around"-Distanzberechnung fälschlicherweise als "gerade passiert" interpretiert werden.
+                    else if (distToSignal < -5 && distToSignal > -50 && window.playerSpeed > 0.5) {
                         window.score -= 100;
                         signal.pointsAwarded = true; // Verhindert weitere Strafen für dieses Signal
 
