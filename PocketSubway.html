@@ -782,8 +782,7 @@
                             }
                         }
 
-                        // Sicherheitsabstand zum Start der Strecke (0m) einhalten.
-                        if (!inStation && totalTrackLength > 500) {
+                        if (!inStation && totalTrackLength > 100) {
                             const color = Math.random() < 0.5 ? 'red' : 'green';
                             signals.push({
                                 distance: totalTrackLength,
