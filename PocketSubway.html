@@ -391,6 +391,9 @@
         let stationWallMaterial, stationFloorMaterial;
         let signalMastMaterial, signalLightRedMaterial, signalLightGreenMaterial, signalBoxRedMaterial, signalBoxGreenMaterial;
         
+        // Instanced Meshes für Signale, global zugänglich für Updates
+        let signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh;
+
         // --- Initialisierung ---
         function init() {
             // Szene
@@ -773,7 +776,7 @@
                             }
                         }
 
-                        if (!inStation) {
+                        if (!inStation && totalTrackLength > 100) {
                             const color = Math.random() < 0.5 ? 'red' : 'green';
                             signals.push({
                                 distance: totalTrackLength,
@@ -1205,20 +1208,17 @@
         function createSignals(curve) {
             if (signals.length === 0) return;
 
-            const mastHeight = 3.6; // Höhe von Tunnelboden (-0.5) bis Unterkante Signalkasten (3.1)
+            const mastHeight = 3.6;
             const mastGeo = new THREE.CylinderGeometry(0.1, 0.15, mastHeight, 8);
             const lightBoxGeo = new THREE.BoxGeometry(0.4, 0.8, 0.4);
             const lightGeo = new THREE.SphereGeometry(0.15, 16, 16);
 
-            const mastMesh = new THREE.InstancedMesh(mastGeo, signalMastMaterial, signals.length);
-
-            const redSignals = signals.filter(s => s.color === 'red');
-            const greenSignals = signals.filter(s => s.color === 'green');
-
-            const redLightBoxMesh = redSignals.length > 0 ? new THREE.InstancedMesh(lightBoxGeo, signalBoxRedMaterial, redSignals.length) : null;
-            const greenLightBoxMesh = greenSignals.length > 0 ? new THREE.InstancedMesh(lightBoxGeo, signalBoxGreenMaterial, greenSignals.length) : null;
-            const redLightMesh = redSignals.length > 0 ? new THREE.InstancedMesh(lightGeo, signalLightRedMaterial, redSignals.length) : null;
-            const greenLightMesh = greenSignals.length > 0 ? new THREE.InstancedMesh(lightGeo, signalLightGreenMaterial, greenSignals.length) : null;
+            // Alle Meshes für die maximale Anzahl an Signalen initialisieren
+            signalMastMesh = new THREE.InstancedMesh(mastGeo, signalMastMaterial, signals.length);
+            redLightBoxMesh = new THREE.InstancedMesh(lightBoxGeo, signalBoxRedMaterial, signals.length);
+            greenLightBoxMesh = new THREE.InstancedMesh(lightBoxGeo, signalBoxGreenMaterial, signals.length);
+            redLightMesh = new THREE.InstancedMesh(lightGeo, signalLightRedMaterial, signals.length);
+            greenLightMesh = new THREE.InstancedMesh(lightGeo, signalLightGreenMaterial, signals.length);
 
             const dummy = new THREE.Object3D();
             const pos = new THREE.Vector3();
@@ -1227,10 +1227,9 @@
             const binormal = new THREE.Vector3();
             const normal = new THREE.Vector3();
 
-            let redIndex = 0;
-            let greenIndex = 0;
-
             signals.forEach((signal, i) => {
+                signal.meshIndex = i; // Wichtig, um das Signal später zu finden
+
                 const t = signal.distance / totalTrackLength;
                 curve.getPointAt(t, pos);
                 curve.getTangentAt(t, tangent);
@@ -1238,84 +1237,108 @@
                 binormal.crossVectors(up, tangent).normalize();
                 normal.crossVectors(tangent, binormal).normalize();
 
-                const signalSideOffset = -2.5; // Rechts von der Strecke (negativer Wert für rechts)
+                const signalSideOffset = -2.5; // Rechts von der Strecke
 
-                // --- Mast und Lichtkasten ---
+                // --- Mast Positionierung ---
                 const mastBasePos = pos.clone().addScaledVector(binormal, signalSideOffset);
-
-                // Mast-Positionierung: Der Mast (Höhe 3.6m) soll von ca. y=-0.5 bis y=3.1 reichen.
-                // Der Mittelpunkt des Masts muss daher bei y = (-0.5 + 3.1) / 2 = 1.3 liegen.
                 const mastCenterPos = mastBasePos.clone().addScaledVector(normal, 1.3);
-
                 dummy.position.copy(mastCenterPos);
                 dummy.up.copy(normal);
-                // Richte den Mast so aus, dass er "nach vorne" (entlang der Tangente) schaut,
-                // während seine "Oberseite" (die Y-Achse des Zylinders) entlang der Normale des Gleises verläuft.
-                // Dies stellt sicher, dass der Mast senkrecht zum Gleisbett steht.
                 dummy.lookAt(mastCenterPos.clone().add(tangent));
                 dummy.scale.set(1, 1, 1);
                 dummy.updateMatrix();
-                mastMesh.setMatrixAt(i, dummy.matrix);
+                signalMastMesh.setMatrixAt(i, dummy.matrix);
 
+                // --- Lichtkasten Positionierung ---
                 const lightBoxPos = mastBasePos.clone().addScaledVector(normal, 3.5);
+                const lightPos = lightBoxPos.clone().addScaledVector(tangent.clone().negate(), 0.2);
 
-                // --- Lichter & Farbige Boxen ---
-                if (signal.color === 'red') {
-                    if (redLightBoxMesh) {
-                        dummy.position.copy(lightBoxPos);
-                        // WICHTIG: Zuerst die 'up'-Richtung festlegen, dann 'lookAt' aufrufen.
-                        // Korrektur: .sub(tangent), damit das Signal dem Spieler zugewandt ist.
-                        dummy.up.copy(normal);
-                        dummy.lookAt(lightBoxPos.clone().sub(tangent));
-                        dummy.updateMatrix();
-                        redLightBoxMesh.setMatrixAt(redIndex, dummy.matrix);
-                    }
-                    if (redLightMesh) {
-                        const lightPos = lightBoxPos.clone().addScaledVector(tangent.negate(), 0.2); // Nach vorne (negierte Tangente)
-                        dummy.position.copy(lightPos);
-                        dummy.updateMatrix();
-                        redLightMesh.setMatrixAt(redIndex, dummy.matrix);
-                    }
-                    redIndex++;
-                } else { // green
-                    if (greenLightBoxMesh) {
-                        dummy.position.copy(lightBoxPos);
-                        // WICHTIG: Zuerst die 'up'-Richtung festlegen, dann 'lookAt' aufrufen.
-                        dummy.up.copy(normal);
-                        dummy.lookAt(lightBoxPos.clone().sub(tangent));
-                        dummy.updateMatrix();
-                        greenLightBoxMesh.setMatrixAt(greenIndex, dummy.matrix);
-                    }
-                    if (greenLightMesh) {
-                        const lightPos = lightBoxPos.clone().addScaledVector(tangent.negate(), 0.2); // Nach vorne (negierte Tangente)
-                        dummy.position.copy(lightPos);
-                        dummy.updateMatrix();
-                        greenLightMesh.setMatrixAt(greenIndex, dummy.matrix);
-                    }
-                    greenIndex++;
-                }
+                // Store transform data for later updates
+                signal.transform = {
+                    lightBoxPos: lightBoxPos.clone(),
+                    lightPos: lightPos.clone(),
+                    up: normal.clone(),
+                    lookAt: lightBoxPos.clone().sub(tangent)
+                };
+
+                dummy.position.copy(lightBoxPos);
+                dummy.up.copy(normal);
+                dummy.lookAt(lightBoxPos.clone().sub(tangent));
+
+                // --- Sichtbarkeit basierend auf initialer Farbe ---
+                const isRed = signal.color === 'red';
+
+                // Roter Kasten und Licht
+                dummy.scale.set(isRed ? 1 : 0, isRed ? 1 : 0, isRed ? 1 : 0);
+                dummy.updateMatrix();
+                redLightBoxMesh.setMatrixAt(i, dummy.matrix);
+
+                // Position für Licht anpassen, Skalierung beibehalten
+                dummy.position.copy(lightPos);
+                dummy.updateMatrix();
+                redLightMesh.setMatrixAt(i, dummy.matrix);
+
+                // Grüner Kasten und Licht
+                dummy.scale.set(isRed ? 0 : 1, isRed ? 0 : 1, isRed ? 0 : 1);
+                dummy.position.copy(lightBoxPos); // Position für Kasten zurücksetzen
+                dummy.up.copy(normal);
+                dummy.lookAt(lightBoxPos.clone().sub(tangent));
+                dummy.updateMatrix();
+                greenLightBoxMesh.setMatrixAt(i, dummy.matrix);
+
+                // Position für Licht anpassen, Skalierung beibehalten
+                dummy.position.copy(lightPos);
+                dummy.updateMatrix();
+                greenLightMesh.setMatrixAt(i, dummy.matrix);
             });
 
-            mastMesh.instanceMatrix.needsUpdate = true;
-            scene.add(mastMesh);
+            // Alle Meshes zur Szene hinzufügen
+            signalMastMesh.instanceMatrix.needsUpdate = true;
+            redLightBoxMesh.instanceMatrix.needsUpdate = true;
+            greenLightBoxMesh.instanceMatrix.needsUpdate = true;
+            redLightMesh.instanceMatrix.needsUpdate = true;
+            greenLightMesh.instanceMatrix.needsUpdate = true;
 
-            if (redLightBoxMesh) {
-                redLightBoxMesh.instanceMatrix.needsUpdate = true;
-                scene.add(redLightBoxMesh);
-            }
-            if (greenLightBoxMesh) {
-                greenLightBoxMesh.instanceMatrix.needsUpdate = true;
-                scene.add(greenLightBoxMesh);
-            }
+            scene.add(signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh);
+        }
 
-            if (redLightMesh) {
-                redLightMesh.instanceMatrix.needsUpdate = true;
-                scene.add(redLightMesh);
-            }
-            if (greenLightMesh) {
-                greenLightMesh.instanceMatrix.needsUpdate = true;
-                scene.add(greenLightMesh);
-            }
+        function updateSignalVisuals(signal) {
+            const index = signal.meshIndex;
+            if (index === undefined || !signal.transform) return;
+
+            const isRed = signal.color === 'red';
+            const dummy = new THREE.Object3D();
+            const { lightBoxPos, lightPos, up, lookAt } = signal.transform;
+
+            // --- Rote Komponenten ---
+            dummy.position.copy(lightBoxPos);
+            dummy.up.copy(up);
+            dummy.lookAt(lookAt);
+            dummy.scale.set(isRed ? 1 : 0, isRed ? 1 : 0, isRed ? 1 : 0);
+            dummy.updateMatrix();
+            redLightBoxMesh.setMatrixAt(index, dummy.matrix);
+
+            dummy.position.copy(lightPos); // Nur Position für das Licht ändern
+            dummy.updateMatrix();
+            redLightMesh.setMatrixAt(index, dummy.matrix);
+
+            // --- Grüne Komponenten ---
+            dummy.position.copy(lightBoxPos);
+            dummy.up.copy(up);
+            dummy.lookAt(lookAt);
+            dummy.scale.set(isRed ? 0 : 1, isRed ? 0 : 1, isRed ? 0 : 1);
+            dummy.updateMatrix();
+            greenLightBoxMesh.setMatrixAt(index, dummy.matrix);
+
+            dummy.position.copy(lightPos); // Nur Position für das Licht ändern
+            dummy.updateMatrix();
+            greenLightMesh.setMatrixAt(index, dummy.matrix);
+
+            // Wichtig: Die .needsUpdate Flags setzen
+            redLightBoxMesh.instanceMatrix.needsUpdate = true;
+            redLightMesh.instanceMatrix.needsUpdate = true;
+            greenLightBoxMesh.instanceMatrix.needsUpdate = true;
+            greenLightMesh.instanceMatrix.needsUpdate = true;
         }
         
         // --- Cockpit Erstellung ---
@@ -1696,8 +1719,8 @@
                         }
                     }
 
-                    // Fall 1: Spieler hält korrekt vor dem roten Signal an
-                    if (distToSignal > 0 && distToSignal < 30) {
+                    // Fall 1: Spieler hält korrekt vor dem roten Signal an (mit kleiner Toleranz für Überschießen)
+                    if (distToSignal > -5 && distToSignal < 30) {
                         if (window.playerSpeed < 0.1) {
                             window.score += 100;
                             signal.pointsAwarded = true; // Verhindert doppelte Punkte/Strafen
@@ -1708,16 +1731,21 @@
                             ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-red-500');
                             ui.statusMessage.classList.add('bg-green-500');
 
+                            // Starte den Timer, um das Signal auf Grün zu schalten
                             setTimeout(() => {
+                                signal.color = 'green';
+                                updateSignalVisuals(signal);
+
+                                // Verstecke die "gehalten"-Nachricht, falls sie noch da ist
                                 if (ui.statusMessage.dataset.signal === signalId) {
                                     ui.statusMessage.classList.add('hidden');
                                     delete ui.statusMessage.dataset.signal;
                                 }
-                            }, 5000);
+                            }, 2000); // 2 Sekunden Verzögerung
                         }
                     }
-                    // Fall 2: Spieler überfährt das rote Signal (in einem kleinen Fenster direkt dahinter)
-                    else if (distToSignal < 0 && distToSignal > -5) {
+                    // Fall 2: Spieler überfährt das rote Signal deutlich
+                    else if (distToSignal < -5 && window.playerSpeed > 0.5) { // Nur bestrafen, wenn man sich noch bewegt
                         window.score -= 100;
                         signal.pointsAwarded = true; // Verhindert weitere Strafen für dieses Signal
 
