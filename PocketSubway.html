@@ -782,7 +782,8 @@
                             }
                         }
 
-                        if (!inStation && totalTrackLength > 100) {
+                        // Sicherheitsabstand zum Start der Strecke (0m) einhalten.
+                        if (!inStation && totalTrackLength > 500) {
                             const color = Math.random() < 0.5 ? 'red' : 'green';
                             signals.push({
                                 distance: totalTrackLength,
@@ -792,6 +793,17 @@
                             nextSignalDistance = totalTrackLength + 1000 + Math.random() * 1000;
                         }
                     }
+                }
+            }
+
+            // Korrektur: Letztes Signal entfernen, wenn es zu nah am Ende/Anfang liegt,
+            // um eine sofortige Strafe bei Rundenbeginn zu vermeiden.
+            if (signals.length > 0) {
+                const lastSignalDistance = signals[signals.length - 1].distance;
+                const distanceFromEnd = totalTrackLength - lastSignalDistance;
+                if (distanceFromEnd < 500) {
+                    console.log(`Letztes Signal bei ${lastSignalDistance.toFixed(0)}m entfernt, da es nur ${distanceFromEnd.toFixed(0)}m vom Ende entfernt ist.`);
+                    signals.pop();
                 }
             }
 
