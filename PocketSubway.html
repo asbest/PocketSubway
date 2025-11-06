@@ -337,6 +337,7 @@
 
         // Sound Variablen
         let engineSound, brakeSound;
+        let dieselRumble, dieselNoiseFilter; // Zusätzliche Komponenten für den Dieselmotor
         let audioStarted = false; 
 
         // Steuerungs- und Physikvariablen
@@ -504,25 +505,48 @@
 
         // --- Audio Nodes Initialisierung ---
         function initAudioNodes() {
-            // Engine Sound (Beschleunigung)
-            engineSound = new Tone.Oscillator({
-                frequency: 100, 
-                type: "sine", 
-                volume: -Infinity // Startet komplett leise
+            // --- Dieselmotor-Sound ---
+            // 1. Das tiefe Grollen des Motors
+            dieselRumble = new Tone.FatOscillator({
+                type: "sawtooth",
+                frequency: 40,
+                detune: 15,
+                count: 3,
+                spread: 30,
+                volume: -Infinity
+            });
+
+            // 2. Das mechanische Rauschen/Zischen
+            dieselNoiseFilter = new Tone.AutoFilter({
+                frequency: "8m",
+                baseFrequency: 150,
+                octaves: 3,
+                filter: {
+                    type: "lowpass",
+                    rolloff: -12,
+                    Q: 1
+                }
             }).toDestination();
 
-            // Brake Sound (Bremsen)
+            const dieselNoise = new Tone.Noise("brown").connect(dieselNoiseFilter);
+            dieselNoise.volume.value = -30;
+            dieselNoise.start();
+            Tone.Transport.start(); // Wichtig für den AutoFilter LFO
+
+            // 3. Mischen und als 'engineSound' ausgeben
+            engineSound = new Tone.Channel({ volume: -10 }).toDestination();
+            dieselRumble.connect(engineSound);
+            dieselNoiseFilter.connect(engineSound); // Verbinde den Filter, nicht die Rauschquelle direkt
+
+            // --- Bremsgeräusch (Druckluft) ---
             brakeSound = new Tone.NoiseSynth({
-                noise: {
-                    type: "pink" 
-                },
+                noise: { type: 'white' },
                 envelope: {
-                    attack: 0.01,
+                    attack: 0.005,
                     decay: 0.1,
-                    sustain: 0.8,
-                    release: 0.2
+                    sustain: 0,
                 },
-                volume: -Infinity 
+                volume: -10
             }).toDestination();
         }
 
@@ -1514,64 +1538,43 @@
             if (playerDistance > totalTrackLength) playerDistance -= totalTrackLength;
             if (playerDistance < 0) playerDistance += totalTrackLength;
 
-            // --- Sound Steuerung ---
-            if (audioStarted) {
+            // --- Sound Steuerung (Diesel-Logik) ---
+            if (audioStarted && dieselRumble) {
                 const now = Tone.now();
-                const minEngineFreq = 80;
-                const maxEngineFreq = 400;
                 const speedRatio = window.playerSpeed / MAX_SPEED;
 
-                // Tatsächliche Beschleunigung berechnen
-                const actualAcceleration = (window.playerSpeed - oldSpeed) / dt;
+                // Starten, falls noch nicht geschehen
+                if (dieselRumble.state !== "started") {
+                    dieselRumble.start(now);
+                }
 
-                if (window.throttle > 0 && window.playerSpeed > 0.1) {
-                    // Beschleunigen oder Geschwindigkeit halten
-                    if (engineSound.state !== "started") {
-                        engineSound.start(now);
-                        engineSound.volume.value = -Infinity; // Start leise
-                    }
-                    const targetFreq = minEngineFreq + speedRatio * (maxEngineFreq - minEngineFreq);
-                    engineSound.frequency.rampTo(targetFreq, 0.1);
+                // --- Motorsteuerung ---
+                const idleFreq = 40;
+                const maxFreq = 120;
+                const targetFreq = idleFreq + (speedRatio * (maxFreq - idleFreq));
+                dieselRumble.frequency.rampTo(targetFreq, 0.2);
 
-                    // Lautstärke basierend auf Beschleunigung und Throttle
-                    const baseVolume = THREE.MathUtils.lerp(-40, -30, window.throttle);
-                    const accelerationFactor = THREE.MathUtils.clamp(actualAcceleration * 2.0, 0, 1);
-                    lastAccelerationFactor = THREE.MathUtils.lerp(lastAccelerationFactor, accelerationFactor, 0.1);
-                    const targetVolume = baseVolume + THREE.MathUtils.lerp(0, 15, lastAccelerationFactor);
+                if (window.throttle > 0.1) {
+                    // Beschleunigen
+                    const targetVolume = THREE.MathUtils.lerp(-20, -5, window.throttle);
+                    dieselRumble.volume.rampTo(targetVolume, 0.1);
+                    dieselNoiseFilter.baseFrequency = THREE.MathUtils.lerp(200, 1500, window.throttle);
+                } else {
+                    // Leerlauf oder Ausrollen
+                    const idleVolume = (window.playerSpeed > 0.1) ? -25 : -Infinity;
+                    dieselRumble.volume.rampTo(idleVolume, 0.8);
+                    dieselNoiseFilter.baseFrequency = 150;
+                }
 
-                    engineSound.volume.rampTo(targetVolume, 0.1);
-
-                    if (brakeSound.volume.value > -Infinity) {
-                        brakeSound.triggerRelease(now);
-                    }
-
-                } else if (window.brake > 0 && window.playerSpeed > 0.1) {
-                    // Bremsen
-                    if (brakeSound.volume.value === -Infinity) {
-                         brakeSound.triggerAttack(now);
-                    }
-                    const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, window.brake * speedRatio);
-                    brakeSound.volume.rampTo(targetBrakeVol, 0.05);
-
-                    if (engineSound.state === "started") {
-                         engineSound.volume.rampTo(-Infinity, 0.5, now);
-                         setTimeout(() => { if (window.brake > 0) engineSound.stop() }, 500);
-                         lastAccelerationFactor = 0;
+                // --- Bremsensteuerung ---
+                if (window.brake > 0.1 && window.playerSpeed > 0.5) {
+                    // Das Zischen nur einmal pro Bremsvorgang auslösen
+                    if (!brakeSound.triggered) {
+                        brakeSound.triggerAttack(now);
+                        brakeSound.triggered = true; // Markierung setzen
                     }
                 } else {
-                    // Leerlauf oder Stillstand
-                     if (engineSound.state === "started") {
-                         const idleVolume = (window.playerSpeed > 0.1) ? -40 : -Infinity;
-                         engineSound.volume.rampTo(idleVolume, 0.5, now);
-                         engineSound.frequency.rampTo(minEngineFreq + speedRatio * 20, 0.5);
-                         if (window.playerSpeed < 0.1) {
-                            setTimeout(() => { if(window.playerSpeed < 0.1 && window.throttle === 0 && window.brake === 0) engineSound.stop() }, 500);
-                         }
-                         lastAccelerationFactor = 0;
-                     }
-                    if (brakeSound.volume.value > -Infinity) {
-                        brakeSound.triggerRelease(now);
-                    }
+                    brakeSound.triggered = false; // Zurücksetzen, wenn Bremse gelöst wird
                 }
             }
         }
