@@ -332,7 +332,7 @@
         let driverCab; 
         let trackCurve; 
         let totalTrackLength = 0;
-        window.playerDistance = 50;
+        window.playerDistance = 0;
         window.playerSpeed = 0;
 
         // Sound Variablen
@@ -782,7 +782,8 @@
                             }
                         }
 
-                        if (!inStation && totalTrackLength > 100) {
+                        // Sicherheitsabstand zum Start der Strecke (0m) einhalten.
+                        if (!inStation && totalTrackLength > 500) {
                             const color = Math.random() < 0.5 ? 'red' : 'green';
                             signals.push({
                                 distance: totalTrackLength,
@@ -792,6 +793,20 @@
                             nextSignalDistance = totalTrackLength + 1000 + Math.random() * 1000;
                         }
                     }
+                }
+            }
+
+            // Korrektur: Alle Signale entfernen, die zu nah am Ende/Anfang liegen,
+            // um eine sofortige Strafe bei Rundenbeginn zu vermeiden (Wrap-Around-Problem).
+            while (signals.length > 0) {
+                const lastSignalDistance = signals[signals.length - 1].distance;
+                const distanceFromEnd = totalTrackLength - lastSignalDistance;
+                if (distanceFromEnd < 500) {
+                    console.log(`Signal bei ${lastSignalDistance.toFixed(0)}m entfernt, da es nur ${distanceFromEnd.toFixed(0)}m vom Ende entfernt ist.`);
+                    signals.pop();
+                } else {
+                    // Sobald ein Signal außerhalb des Puffers gefunden wird, können wir aufhören.
+                    break;
                 }
             }
 
