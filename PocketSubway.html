@@ -1142,15 +1142,19 @@
                 stationGroup.add(stationLight4);
 
                 // --- Personen hinzufügen ---
-                const numPeople = Math.floor(Math.random() * 11) + 5; 
-                const personMaterial = new THREE.MeshStandardMaterial({ 
-                    color: new THREE.Color(Math.random(), Math.random(), Math.random()), 
-                    roughness: 0.7,
-                    metalness: 0.1
-                });
-                const headGeo = new THREE.SphereGeometry(0.2, 8, 8); 
-                const bodyGeo = new THREE.CylinderGeometry(0.25, 0.25, 1.0, 8); 
-                const limbGeo = new THREE.BoxGeometry(0.15, 0.6, 0.15); 
+                const numPeople = Math.floor(Math.random() * 8) + 4; // Etwas weniger, da komplexer
+
+                // Geometrien für Personen - detaillierter
+                const headGeo = new THREE.SphereGeometry(0.18, 16, 12);
+                const torsoGeo = new THREE.CylinderGeometry(0.2, 0.3, 0.6, 12); // Oben (Schultern) breiter
+                const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.75, 8);
+                const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.65, 8);
+                const footGeo = new THREE.BoxGeometry(0.18, 0.08, 0.3);
+
+                // Material-Paletten
+                const skinTones = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0xffdbac];
+                const shirtColors = [0x1e88e5, 0xd81b60, 0x004d40, 0xffc107, 0x6d4c41, 0x455a64, 0xf5f5f5, 0x212121];
+                const pantsColors = [0x212121, 0x37474f, 0x0d47a1, 0x5d4037, 0x1b5e20];
 
                 const minXRelativeFromEdge = 0.3; 
                 const maxXRelativeFromEdge = 1.0; 
@@ -1161,38 +1165,51 @@
 
                 for (let j = 0; j < numPeople; j++) {
                     const personGroup = new THREE.Group();
+
+                    // Erstelle individuelle Materialien für diese Person
+                    const skinMat = new THREE.MeshStandardMaterial({ color: skinTones[Math.floor(Math.random() * skinTones.length)], roughness: 0.8 });
+                    const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColors[Math.floor(Math.random() * shirtColors.length)], roughness: 0.9 });
+                    const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColors[Math.floor(Math.random() * pantsColors.length)], roughness: 0.8 });
+                    const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
                     
                     // Kopf
-                    const head = new THREE.Mesh(headGeo, personMaterial);
-                    head.position.y = 1.6; 
+                    const head = new THREE.Mesh(headGeo, skinMat);
+                    head.position.y = 1.6;
                     personGroup.add(head);
 
-                    // Körper
-                    const body = new THREE.Mesh(bodyGeo, personMaterial);
-                    body.position.y = 1.0; 
-                    personGroup.add(body);
+                    // Körper (Torso)
+                    const torso = new THREE.Mesh(torsoGeo, shirtMat);
+                    torso.position.y = 1.15;
+                    personGroup.add(torso);
 
                     // Arme
-                    const armLeft = new THREE.Mesh(limbGeo, personMaterial);
-                    armLeft.position.set(-0.3, 1.3, 0); 
-                    armLeft.rotation.z = Math.PI / 16; 
+                    const armLeft = new THREE.Mesh(armGeo, skinMat);
+                    armLeft.position.set(-0.35, 1.3, 0);
+                    armLeft.rotation.z = Math.PI / 16;
                     personGroup.add(armLeft);
 
-                    const armRight = armLeft.clone();
-                    armRight.position.x = 0.3;
-                    armRight.position.y = 1.3; 
-                    armRight.rotation.z = -Math.PI / 16; 
+                    const armRight = new THREE.Mesh(armGeo, skinMat);
+                    armRight.position.set(0.35, 1.3, 0);
+                    armRight.rotation.z = -Math.PI / 16;
                     personGroup.add(armRight);
 
                     // Beine
-                    const legLeft = new THREE.Mesh(limbGeo, personMaterial);
-                    legLeft.position.set(-0.15, 0.3, 0);
+                    const legLeft = new THREE.Mesh(legGeo, pantsMat);
+                    legLeft.position.set(-0.12, 0.45, 0);
                     personGroup.add(legLeft);
 
-                    const legRight = legLeft.clone();
-                    legRight.position.x = 0.15;
+                    const legRight = new THREE.Mesh(legGeo, pantsMat);
+                    legRight.position.set(0.12, 0.45, 0);
                     personGroup.add(legRight);
 
+                    // Füße
+                    const footLeft = new THREE.Mesh(footGeo, shoesMat);
+                    footLeft.position.set(-0.12, 0.04, 0.05);
+                    personGroup.add(footLeft);
+
+                    const footRight = new THREE.Mesh(footGeo, shoesMat);
+                    footRight.position.set(0.12, 0.04, 0.05);
+                    personGroup.add(footRight);
 
                     // Zufällige Position auf dem Bahnsteig
                     let randomXRelative = Math.random() * (maxXRelative - minXRelative) + minXRelative; 
