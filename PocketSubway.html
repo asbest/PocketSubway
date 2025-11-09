@@ -459,7 +459,7 @@
         }
 
         // --- Globale Variablen ---
-        let scene, camera, renderer, clock, stats; 
+        let scene, camera, renderer, clock, stats, trackGroup;
         let driverCab; 
         let trackCurve; 
         let totalTrackLength = 0;
@@ -543,6 +543,10 @@
 
             // Uhr
             clock = new THREE.Clock();
+
+            // Gruppe für alle Strecken-Objekte
+            trackGroup = new THREE.Group();
+            scene.add(trackGroup);
 
             // Kamera (First-Person)
             camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -995,7 +999,7 @@
             const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
             const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 32, false);
             const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
-            scene.add(tunnelMesh);
+            trackGroup.add(tunnelMesh);
 
             // Tunnelbögen hinzufügen
             createTunnelArches(curve, tunnelOffsetY);
@@ -1011,8 +1015,8 @@
             const railMeshLeft = new THREE.Mesh(railGeo, railMaterial);
             const railMeshRight = new THREE.Mesh(railGeo.clone().copy(new THREE.TubeGeometry(railCurveRight, TUBE_SEGMENTS, 0.1, 4, false)), railMaterial);
             
-            scene.add(railMeshLeft);
-            scene.add(railMeshRight);
+            trackGroup.add(railMeshLeft);
+            trackGroup.add(railMeshRight);
 
 
             // 4. Schwellen
@@ -1039,7 +1043,7 @@
                 tieMesh.setMatrixAt(i, dummy.matrix);
             }
             tieMesh.instanceMatrix.needsUpdate = true;
-            scene.add(tieMesh);
+            trackGroup.add(tieMesh);
 
             // 5. Gleisbett
             const trackbedGeo = new THREE.BoxGeometry(3.0, 0.2, 1.5);
@@ -1060,7 +1064,7 @@
                 trackbedMesh.setMatrixAt(i, dummy.matrix);
             }
             trackbedMesh.instanceMatrix.needsUpdate = true;
-            scene.add(trackbedMesh);
+            trackGroup.add(trackbedMesh);
         }
 
         function createTunnelArches(curve, tunnelOffsetY) {
@@ -1118,7 +1122,7 @@
             }
             archMesh.count = archIndex; // Wichtig, falls Bögen übersprungen wurden
             archMesh.instanceMatrix.needsUpdate = true;
-            scene.add(archMesh);
+            trackGroup.add(archMesh);
         }
 
         function createTunnelDetails(curve, tunnelOffsetY) {
@@ -1181,7 +1185,7 @@
             cableMesh1.instanceMatrix.needsUpdate = true;
             cableMesh2.instanceMatrix.needsUpdate = true;
             cableMesh3.instanceMatrix.needsUpdate = true;
-            scene.add(cableMesh1, cableMesh2, cableMesh3);
+            trackGroup.add(cableMesh1, cableMesh2, cableMesh3);
         }
 
         // --- Bahnhöfe ---
@@ -1205,7 +1209,7 @@
                 const stationGroup = new THREE.Group();
                 stationGroup.position.copy(pos);
                 stationGroup.lookAt(pos.clone().add(tangent)); 
-                scene.add(stationGroup);
+                trackGroup.add(stationGroup);
 
                 // 1. Plattform
                 const platformGeo = new THREE.BoxGeometry(platformWidth, 0.5, station.length); 
@@ -1456,7 +1460,7 @@
             redLightMesh.instanceMatrix.needsUpdate = true;
             greenLightMesh.instanceMatrix.needsUpdate = true;
 
-            scene.add(signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh);
+            trackGroup.add(signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh);
         }
 
         function updateSignalVisuals(signal) {
@@ -1579,13 +1583,33 @@
 
         function saveGame() {
             try {
+                // Umfassenderer Spielzustand
                 const gameState = {
+                    saveVersion: 2, // Zur späteren Unterscheidung von alten Speicherständen
+
+                    // Spieler-Zustand
                     playerDistance: window.playerDistance,
+                    playerSpeed: window.playerSpeed,
+                    throttle: window.throttle,
+                    brake: window.brake,
                     score: window.score,
+
+                    // Spiel-Konfiguration
                     boosterPurchased: boosterPurchased,
-                    signalsState: signals.map(s => ({ distance: s.distance, color: s.color, pointsAwarded: s.pointsAwarded })),
-                    stationsState: stations.map(st => ({ distance: st.distance, visited: st.visited })),
-                    maxSpeed: MAX_SPEED
+                    maxSpeed: MAX_SPEED,
+
+                    // Streckendaten
+                    // Wichtig: THREE.Vector3 muss für JSON in ein einfaches Objekt konvertiert werden
+                    trackPoints: trackCurve.points.map(p => ({ x: p.x, y: p.y, z: p.z })),
+                    totalTrackLength: totalTrackLength,
+
+                    // Vollständige Objekt-Daten
+                    stations: stations, // Speichert das komplette Array
+                    signals: signals.map(s => ({ // Speichere nur die Daten, nicht die 3D-Objekt-Referenzen
+                        distance: s.distance,
+                        color: s.color,
+                        pointsAwarded: s.pointsAwarded,
+                    })),
                 };
 
                 const gameStateJSON = JSON.stringify(gameState);
@@ -1615,51 +1639,83 @@
                 const gameStateJSON = localStorage.getItem('pocketSubwaySave');
                 if (!gameStateJSON) {
                     console.warn('Kein Spielstand gefunden.');
-                    const originalText = ui.loadButton.innerText;
-                    ui.loadButton.innerText = 'Nichts gefunden!';
-                     setTimeout(() => {
-                        ui.loadButton.innerText = originalText;
-                    }, 2000);
+                    // UI-Feedback...
                     return;
                 }
 
                 const gameState = JSON.parse(gameStateJSON);
 
-                // Spielzustand wiederherstellen
-                window.playerDistance = gameState.playerDistance;
-                window.score = gameState.score;
-                boosterPurchased = gameState.boosterPurchased;
-                MAX_SPEED = gameState.maxSpeed || 33.3;
+                // --- Kompatibilität für alte Speicherstände ---
+                if (!gameState.saveVersion || gameState.saveVersion < 2) {
+                    console.warn('Lade veralteten Spielstand. Nur Basis-Daten werden wiederhergestellt.');
+                    window.playerDistance = gameState.playerDistance || 0;
+                    window.score = gameState.score || 0;
+                    boosterPurchased = gameState.boosterPurchased || false;
+                    MAX_SPEED = gameState.maxSpeed || 33.3;
+                    window.playerSpeed = 0; // Alte Saves hatten keine Geschwindigkeit
+                    window.throttle = 0;
+                    window.brake = 0;
+                    // Hinweis: Die Strecke wird nicht geladen, es wird die neu generierte verwendet.
+                } else {
+                    // --- Laden des neuen, vollständigen Spielstands ---
 
-                // Synchronisiere den Zustand der Signale
-                gameState.signalsState.forEach(savedSignal => {
-                    const gameSignal = signals.find(s => s.distance === savedSignal.distance);
-                    if (gameSignal) {
-                        gameSignal.color = savedSignal.color;
-                        gameSignal.pointsAwarded = savedSignal.pointsAwarded;
-                        updateSignalVisuals(gameSignal); // Visuelle Darstellung aktualisieren
+                    // 1. Alle alten Streckenobjekte entfernen
+                    while(trackGroup.children.length > 0){
+                        const obj = trackGroup.children[0];
+                        trackGroup.remove(obj);
+                        // Wichtig: Geometrie und Material freigeben, um Speicherlecks zu vermeiden
+                        if(obj.geometry) obj.geometry.dispose();
+                        if(obj.material) {
+                            if (Array.isArray(obj.material)) {
+                                obj.material.forEach(m => m.dispose());
+                            } else {
+                                obj.material.dispose();
+                            }
+                        }
                     }
-                });
+                    // Auch die globalen Arrays zurücksetzen
+                    stations.length = 0;
+                    signals.length = 0;
 
-                // Synchronisiere den Zustand der Stationen
-                gameState.stationsState.forEach(savedStation => {
-                    const gameStation = stations.find(s => s.distance === savedStation.distance);
-                    if (gameStation) {
-                        gameStation.visited = savedStation.visited;
-                    }
-                });
+                    // 2. Spielzustand wiederherstellen
+                    window.playerDistance = gameState.playerDistance;
+                    window.playerSpeed = gameState.playerSpeed;
+                    window.throttle = gameState.throttle;
+                    window.brake = gameState.brake;
+                    window.score = gameState.score;
+                    boosterPurchased = gameState.boosterPurchased;
+                    MAX_SPEED = gameState.maxSpeed;
+                    totalTrackLength = gameState.totalTrackLength;
 
-                // Setze transiente Zustände zurück, um unerwartetes Verhalten zu vermeiden
-                window.playerSpeed = 0;
-                window.throttle = 0;
-                window.brake = 0;
+                    // 3. Globale Arrays mit gespeicherten Daten füllen
+                    gameState.stations.forEach(s => stations.push(s));
+                    gameState.signals.forEach(s => signals.push(s));
+
+                    // 4. Strecke aus den gespeicherten Punkten neu erstellen
+                    const loadedPoints = gameState.trackPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
+                    trackCurve = new THREE.CatmullRomCurve3(loadedPoints);
+                    trackCurve.curveType = 'catmullrom';
+                    trackCurve.tension = 0.5;
+
+                    // 5. Geometrie basierend auf der geladenen Kurve neu aufbauen
+                    createTrackGeometry(trackCurve);
+                    createStations(trackCurve);
+                    createSignals(trackCurve);
+                     const tunnelCircumference = 2 * Math.PI * 5.0;
+                    const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
+                    const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
+                    tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
+                    tunnelMaterial.map.needsUpdate = true;
+                }
+
+                // --- Gemeinsame abschließende Schritte ---
                 doorsOpen = false;
 
                 // UI-Elemente aktualisieren
-                ui.throttleSlider.value = 0;
-                ui.throttleValue.innerText = '0%';
-                ui.brakeSlider.value = 0;
-                ui.brakeValue.innerText = '0%';
+                ui.throttleSlider.value = window.throttle * 100;
+                ui.throttleValue.innerText = `${Math.round(window.throttle * 100)}%`;
+                ui.brakeSlider.value = window.brake * 100;
+                ui.brakeValue.innerText = `${Math.round(window.brake * 100)}%`;
                 updateDoorButton();
 
                 console.log('Spielstand geladen!');
@@ -1669,7 +1725,9 @@
                 setTimeout(() => {
                     ui.loadButton.innerText = originalText;
                     ui.loadButton.disabled = false;
-                    togglePause(); // Weiterspielen
+                    if (isPaused) {
+                        togglePause(); // Weiterspielen
+                    }
                 }, 1000);
 
 
