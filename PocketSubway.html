@@ -1444,8 +1444,6 @@
             });
             ui.saveButton.addEventListener('click', saveGame);
             ui.loadButton.addEventListener('click', loadGame);
-
-
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'p' || e.key === 'Escape') {
                     togglePause();
@@ -1545,7 +1543,7 @@
                 }, 2000);
             }
         }
-        
+
         function togglePause() {
             isPaused = !isPaused;
 
