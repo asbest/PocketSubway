@@ -492,7 +492,7 @@
         const stations = [];
         const signals = [];
         window.signals = signals; // Exposed for verification
-        const NUM_SEGMENTS = 50;
+        const NUM_SEGMENTS = 10;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
         const STATION_LENGTH = 200; 
@@ -533,6 +533,8 @@
         
         // Instanced Meshes für Signale, global zugänglich für Updates
         let signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh;
+        let branchCurve = null; // Kurve für den visuellen Gleisabzweig
+        let switchInfo = null; // Informationen über die Position und Art der Weiche
 
         // --- Initialisierung ---
         function init() {
@@ -861,6 +863,8 @@
             
             let lastWasStation = true; 
             let nextSignalDistance = 1000 + Math.random() * 1000;
+            const switchDistance = 1000 + Math.random() * 1000;
+            let switchGenerated = false;
 
             // --- 3. Restliche Strecke prozedural generieren ---
             for (let i = 1; i < NUM_SEGMENTS; i++) { 
@@ -908,6 +912,45 @@
                     currentPos.add(currentDir);
                     points.push(currentPos.clone());
                     totalTrackLength++;
+
+                    // --- Weiche generieren ---
+                    if (totalTrackLength >= switchDistance && !switchGenerated) {
+                        switchGenerated = true;
+
+                        const switchDirection = Math.random() < 0.5 ? -1 : 1; // -1 for left, 1 for right
+
+                        // Store switch information
+                        switchInfo = {
+                            distance: totalTrackLength,
+                            position: currentPos.clone(),
+                            tangent: currentDir.clone(),
+                            up: up.clone(),
+                            switchDirection: switchDirection
+                        };
+                        window.switchInfo = switchInfo; // Expose for verification
+
+                        // --- Abzweig generieren ---
+                        const branchPoints = [];
+                        let branchPos = currentPos.clone();
+                        let branchDir = currentDir.clone();
+                        let branchCurvature = currentCurvature;
+                        const branchTargetCurvature = switchDirection * MAX_CURVATURE * 1.5; // Stärkere Kurve für den Abzweig
+                        const branchLength = 1500; // Feste Länge für den sichtbaren Abzweig
+
+                        for (let j = 0; j < branchLength; j++) {
+                            branchCurvature += (branchTargetCurvature - branchCurvature) * 0.01; // Langsamerer Übergang
+
+                            tempQuat.setFromAxisAngle(up, branchCurvature);
+                            branchDir.applyQuaternion(tempQuat);
+
+                            branchPos.add(branchDir);
+                            branchPoints.push(branchPos.clone());
+                        }
+                        branchCurve = new THREE.CatmullRomCurve3(branchPoints);
+                        branchCurve.curveType = 'catmullrom';
+                        branchCurve.tension = 0.5;
+                    }
+
 
                     // --- Signal Platzierung ---
                     if (totalTrackLength >= nextSignalDistance) {
@@ -996,10 +1039,77 @@
             }
 
             // 1. Der Tunnel
-            const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
-            const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 32, false);
-            const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
-            trackGroup.add(tunnelMesh);
+            if (switchInfo) {
+                const cavernLength = 100; // Länge der Weichenhöhle
+                const cavernWidth = 12; // Breite der Höhle
+                const cavernHeight = 8; // Höhe der Höhle
+
+                const switchStartIndex = Math.floor(switchInfo.distance - 20);
+                const switchEndIndex = switchStartIndex + cavernLength;
+
+                // 1. Tunnel vor der Weiche
+                const preSwitchPoints = tunnelPoints.slice(0, switchStartIndex);
+                if (preSwitchPoints.length > 1) {
+                    const preSwitchCurve = new THREE.CatmullRomCurve3(preSwitchPoints);
+                    const preSwitchGeo = new THREE.TubeGeometry(preSwitchCurve, preSwitchPoints.length * 2, tunnelRadius, 16, false);
+                    trackGroup.add(new THREE.Mesh(preSwitchGeo, tunnelMaterial));
+                }
+
+                // 2. Weichenhöhle (als breiter Kasten)
+                const cavernGeo = new THREE.BoxGeometry(cavernWidth, cavernHeight, cavernLength);
+                const cavernMesh = new THREE.Mesh(cavernGeo, tunnelMaterial);
+                const cavernCenterT = (switchInfo.distance + cavernLength / 2 - 20) / totalTrackLength;
+                const cavernPos = curve.getPointAt(cavernCenterT);
+                const cavernTangent = curve.getTangentAt(cavernCenterT);
+                cavernMesh.position.copy(cavernPos).add(new THREE.Vector3(0, tunnelOffsetY, 0));
+                cavernMesh.lookAt(cavernPos.clone().add(cavernTangent).add(new THREE.Vector3(0, tunnelOffsetY, 0)));
+                trackGroup.add(cavernMesh);
+
+                // 3. Tunnel nach der Weiche (Hauptstrecke)
+                const postSwitchPoints = tunnelPoints.slice(switchEndIndex);
+                 if (postSwitchPoints.length > 1) {
+                    const postSwitchCurve = new THREE.CatmullRomCurve3(postSwitchPoints);
+                    const postSwitchGeo = new THREE.TubeGeometry(postSwitchCurve, postSwitchPoints.length * 2, tunnelRadius, 16, false);
+                    trackGroup.add(new THREE.Mesh(postSwitchGeo, tunnelMaterial));
+                }
+
+                // 4. Tunnel für den Abzweig
+                const branchTunnelPoints = [];
+                const numBranchTunnelPoints = Math.floor(branchCurve.getLength());
+                for(let i = 50; i < numBranchTunnelPoints; i++) { // Starten nach der Höhle
+                    const t = i / numBranchTunnelPoints;
+                    branchCurve.getPointAt(t, pos);
+                    branchCurve.getTangentAt(t, tangent);
+                    binormal.crossVectors(up, tangent).normalize();
+                    normal.crossVectors(tangent, binormal).normalize();
+                    branchTunnelPoints.push(pos.clone().add(normal.clone().multiplyScalar(tunnelOffsetY)));
+                }
+                 if (branchTunnelPoints.length > 1) {
+                    const branchTunnelCurve = new THREE.CatmullRomCurve3(branchTunnelPoints);
+                    const branchTunnelGeo = new THREE.TubeGeometry(branchTunnelCurve, branchTunnelPoints.length, tunnelRadius, 16, false);
+                    trackGroup.add(new THREE.Mesh(branchTunnelGeo, tunnelMaterial));
+                }
+
+                // 5. Stützpfeiler in der Höhle
+                const pillarGeo = new THREE.CylinderGeometry(0.5, 0.5, cavernHeight, 16);
+                const pillarCount = 5;
+                for (let i = 0; i < pillarCount; i++) {
+                    const pillar = new THREE.Mesh(pillarGeo, tieMaterial); // Wiederverwenden des Schwellenmaterials
+                    const distAlongCavern = (i / (pillarCount -1)) * (cavernLength - 20) + 10;
+                    const pillarT = (switchInfo.distance - 20 + distAlongCavern) / totalTrackLength;
+                    const pillarPos = curve.getPointAt(pillarT);
+                    pillar.position.copy(pillarPos).add(new THREE.Vector3(0, tunnelOffsetY, 0));
+                    trackGroup.add(pillar);
+                }
+
+
+            } else {
+                // Fallback: Normaler durchgehender Tunnel
+                const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
+                const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 32, false);
+                const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
+                trackGroup.add(tunnelMesh);
+            }
 
             // Tunnelbögen hinzufügen
             createTunnelArches(curve, tunnelOffsetY);
@@ -1065,6 +1175,59 @@
             }
             trackbedMesh.instanceMatrix.needsUpdate = true;
             trackGroup.add(trackbedMesh);
+
+            // --- Abzweiggleis zeichnen, falls vorhanden ---
+            if (branchCurve) {
+                const branchRailPointsLeft = [];
+                const branchRailPointsRight = [];
+                const branchNumPoints = Math.floor(branchCurve.getLength());
+
+                for (let i = 0; i < branchNumPoints; i++) {
+                    const t = i / branchNumPoints;
+                    branchCurve.getPointAt(t, pos);
+                    branchCurve.getTangentAt(t, tangent);
+                    binormal.crossVectors(up, tangent).normalize();
+                    normal.crossVectors(tangent, binormal).normalize();
+                    const posLeft = pos.clone().add(binormal.clone().multiplyScalar(railOffset)).add(normal.clone().multiplyScalar(railHeight));
+                    const posRight = pos.clone().add(binormal.clone().multiplyScalar(-railOffset)).add(normal.clone().multiplyScalar(railHeight));
+                    branchRailPointsLeft.push(posLeft);
+                    branchRailPointsRight.push(posRight);
+                }
+
+                const branchRailCurveLeft = new THREE.CatmullRomCurve3(branchRailPointsLeft);
+                const branchRailCurveRight = new THREE.CatmullRomCurve3(branchRailPointsRight);
+                const branchRailGeo = new THREE.TubeGeometry(branchRailCurveLeft, 256, 0.1, 4, false);
+                const branchRailMeshLeft = new THREE.Mesh(branchRailGeo, railMaterial);
+                const branchRailMeshRight = new THREE.Mesh(branchRailGeo.clone().copy(new THREE.TubeGeometry(branchRailCurveRight, 256, 0.1, 4, false)), railMaterial);
+                trackGroup.add(branchRailMeshLeft, branchRailMeshRight);
+
+                const branchTieCount = Math.floor(branchCurve.getLength() / 1.5);
+                const branchTieMesh = new THREE.InstancedMesh(tieGeo, tieMaterial, branchTieCount);
+                for (let i = 0; i < branchTieCount; i++) {
+                    const t = i / branchTieCount;
+                    branchCurve.getPointAt(t, dummy.position);
+                    branchCurve.getPointAt((t + 0.01) % 1, lookAtPos);
+                    dummy.position.y -= 0.075;
+                    dummy.lookAt(lookAtPos);
+                    dummy.updateMatrix();
+                    branchTieMesh.setMatrixAt(i, dummy.matrix);
+                }
+                branchTieMesh.instanceMatrix.needsUpdate = true;
+                trackGroup.add(branchTieMesh);
+
+                const branchTrackbedMesh = new THREE.InstancedMesh(trackbedGeo, trackbedMaterial, branchTieCount);
+                 for (let i = 0; i < branchTieCount; i++) {
+                    const t = i / branchTieCount;
+                    branchCurve.getPointAt(t, dummy.position);
+                    branchCurve.getPointAt((t + 0.01) % 1, lookAtPos);
+                    dummy.position.y -= 0.25;
+                    dummy.lookAt(lookAtPos);
+                    dummy.updateMatrix();
+                    branchTrackbedMesh.setMatrixAt(i, dummy.matrix);
+                }
+                branchTrackbedMesh.instanceMatrix.needsUpdate = true;
+                trackGroup.add(branchTrackbedMesh);
+            }
         }
 
         function createTunnelArches(curve, tunnelOffsetY) {
@@ -1676,6 +1839,9 @@
                     // Auch die globalen Arrays zurücksetzen
                     stations.length = 0;
                     signals.length = 0;
+                    // Bugfix: Weichen-Informationen zurücksetzen, um Rendering-Fehler bei geladenen Strecken zu vermeiden
+                    switchInfo = null;
+                    branchCurve = null;
 
                     // 2. Spielzustand wiederherstellen
                     window.playerDistance = gameState.playerDistance;
