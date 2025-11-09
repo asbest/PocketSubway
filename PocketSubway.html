@@ -159,7 +159,7 @@
         </div>
     </div>
 
-    <div id="fact-display" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-black bg-opacity-60 p-4 rounded-lg max-w-lg text-center text-lg hidden z-30 shadow-lg">
+    <div id="fact-display" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black bg-opacity-75 p-6 rounded-xl max-w-md text-center text-xl hidden z-30 shadow-2xl border border-gray-700">
     </div>
 
     <script type="module">
@@ -1649,6 +1649,19 @@
                     }
                 });
 
+                // Setze transiente Zustände zurück, um unerwartetes Verhalten zu vermeiden
+                window.playerSpeed = 0;
+                window.throttle = 0;
+                window.brake = 0;
+                doorsOpen = false;
+
+                // UI-Elemente aktualisieren
+                ui.throttleSlider.value = 0;
+                ui.throttleValue.innerText = '0%';
+                ui.brakeSlider.value = 0;
+                ui.brakeValue.innerText = '0%';
+                updateDoorButton();
+
                 console.log('Spielstand geladen!');
                 const originalText = ui.loadButton.innerText;
                 ui.loadButton.innerText = 'Geladen!';
@@ -2067,6 +2080,8 @@
 
         // --- Start ---
         init();
+
+        window.testShowFact = showRandomFact; // Temporärer Testhaken
 
     </script>
 </body>
