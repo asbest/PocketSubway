@@ -492,7 +492,7 @@
         const stations = [];
         const signals = [];
         window.signals = signals; // Exposed for verification
-        const NUM_SEGMENTS = 10;
+        const NUM_SEGMENTS = 5;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
         const STATION_LENGTH = 200; 
@@ -1076,7 +1076,7 @@
                 // 4. Tunnel für den Abzweig
                 const branchTunnelPoints = [];
                 const numBranchTunnelPoints = Math.floor(branchCurve.getLength());
-                for(let i = 50; i < numBranchTunnelPoints; i++) { // Starten nach der Höhle
+                for(let i = 80; i < numBranchTunnelPoints; i++) { // Start-Offset erhöht, um die Überschneidung weiter zu reduzieren
                     const t = i / numBranchTunnelPoints;
                     branchCurve.getPointAt(t, pos);
                     branchCurve.getTangentAt(t, tangent);
