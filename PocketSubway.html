@@ -81,6 +81,12 @@
             <button id="resume-button" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
                 Weiter
             </button>
+            <button id="save-button" class="bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
+                Spiel speichern
+            </button>
+            <button id="load-button" class="bg-yellow-500 hover:bg-yellow-400 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
+                Spiel laden
+            </button>
             <button id="restart-button" class="bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
                 Neustart
             </button>
@@ -151,6 +157,9 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <div id="fact-display" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-black bg-opacity-60 p-4 rounded-lg max-w-lg text-center text-lg hidden z-30 shadow-lg">
     </div>
 
     <script type="module">
@@ -327,6 +336,128 @@
             return prefix + middle + suffix;
         }
 
+        const subwayFacts = [
+            "Die erste U-Bahn der Welt fuhr am 10. Januar 1863 in London.",
+            "Die Londoner U-Bahn wird liebevoll 'The Tube' (Die Röhre) genannt.",
+            "Das U-Bahn-Netz von Shanghai ist das größte der Welt mit über 800 km Streckenlänge.",
+            "Nur 45% des Londoner U-Bahn-Netzes verläuft tatsächlich unterirdisch.",
+            "Die tiefste U-Bahn-Station der Welt ist Arsenalna in Kiew, 105,5 Meter unter der Oberfläche.",
+            "Die U-Bahn von Stockholm wird oft als die längste Kunstgalerie der Welt bezeichnet, da über 90 der 100 Stationen dekoriert sind.",
+            "In der Moskauer U-Bahn gibt es eine Ringlinie, auf der die Ansagen im Uhrzeigersinn von einer männlichen und gegen den Uhrzeigersinn von einer weiblichen Stimme gesprochen werden.",
+            "Während des Zweiten Weltkriegs wurden viele Londoner U-Bahn-Stationen als Luftschutzbunker genutzt.",
+            "Die New Yorker U-Bahn ist eines der wenigen 24-Stunden-Systeme der Welt.",
+            "In der U-Bahn von Toronto gibt es eine 'Geisterstation' namens Lower Bay, die für Filmaufnahmen genutzt wird.",
+            "Die U-Bahn in Pjöngjang, Nordkorea, liegt so tief, dass sie auch als Atomschutzbunker dient. Ausgemusterte Berliner U-Bahn-Wagen sind dort noch im Einsatz.",
+            "Einige Züge verfügen über Sandstreuer, um bei rutschigen Schienen (z.B. durch Laub) die Reibung zu erhöhen.",
+            "Weichen sind oft beheizt, damit sie im Winter nicht einfrieren und funktionsfähig bleiben.",
+            "Das 'U' in U-Bahn steht ursprünglich für 'unabhängig', da die Bahn auf einem vom restlichen Verkehr getrennten Schienennetz fährt.",
+            "In vielen Bahnhöfen sind metallbeschichtete Luftballons verboten, da sie Kurzschlüsse in den Oberleitungen verursachen können.",
+            "In den Tunneln der Londoner U-Bahn lebt eine eigene Mückenart, die sich an das unterirdische Leben angepasst hat.",
+            "Die kürzeste U-Bahn-Linie der Welt ist die 'Tünel' in Istanbul, die nur 573 Meter lang ist.",
+            "Die Pariser Métro hat so viele Stationen, dass man von keinem Punkt in der Stadt mehr als 500 Meter zur nächsten Station laufen muss.",
+            "Die U-Bahn von Mexiko-Stadt fährt auf Gummireifen statt auf Stahlrädern, was für eine ruhigere Fahrt sorgt.",
+            "In der U-Bahn von Helsinki können Fahrgäste in einer speziellen Sauna-Gondel fahren.",
+            "Der U-Bahnhof Hermannplatz in Berlin war der erste, der mit einer Rolltreppe ausgestattet wurde.",
+            "Der Geruch der Londoner U-Bahn ist so einzigartig, dass er 2001 als Markenzeichen geschützt werden sollte.",
+            "Die Berliner U-Bahn hat zwei verschiedene Profile: Kleinprofil (U1-U4) und Großprofil (U5-U9) mit unterschiedlich breiten Zügen.",
+            "Einige Stationen der Münchner U-Bahn wurden von bekannten Künstlern wie Joseph Beuys gestaltet.",
+            "Die U-Bahn in Dubai ist komplett fahrerlos und wird von einem zentralen System gesteuert.",
+            "Die schnellste U-Bahn der Welt ist der Maglev in Shanghai, der Geschwindigkeiten von bis zu 431 km/h erreicht.",
+            "In der U-Bahn von Kairo gibt es separate Wagen nur für Frauen.",
+            "Die erste U-Bahn auf dem afrikanischen Kontinent wurde 1987 in Kairo eröffnet.",
+            "Der U-Bahnhof Solna Centrum in Stockholm sieht aus wie eine feuerrote Höhle und soll die 'Tore zur Hölle' darstellen.",
+            "Die U-Bahn von Buenos Aires hat noch historische Holzwagen aus den 1910er Jahren im Einsatz.",
+            "Die U-Bahn in Athen ist ein rollendes Museum. Beim Bau wurden so viele archäologische Schätze gefunden, dass viele Stationen sie ausstellen.",
+            "Es gibt eine unvollendete 'Geisterlinie' (U10) in Berlin, deren Tunnel teilweise für Veranstaltungen genutzt werden.",
+            "Die U-Bahn in Glasgow ist die drittälteste der Welt und hat eine kreisförmige Linie, die 'The Clockwork Orange' genannt wird.",
+            "Auf der U-Bahn-Linie 1 in New York gibt es eine vergessene Station namens 'City Hall Loop' mit beeindruckender Architektur, die man auf Sonderfahrten besichtigen kann.",
+            "Die U-Bahn in Santiago de Chile gilt als eine der modernsten und saubersten in Lateinamerika.",
+            "In der U-Bahn von Tokio gibt es Mitarbeiter (Oshiya), deren Aufgabe es ist, Fahrgäste in die vollen Züge zu schieben.",
+            "Die Station 'Canary Wharf' in London wurde in einem ehemaligen Hafenbecken gebaut und ist groß genug, um einen Wolkenkratzer liegend aufzunehmen.",
+            "Die U-Bahn von São Paulo befördert täglich über 4 Millionen Menschen und ist eines der verkehrsreichsten Netze der Welt.",
+            "Der U-Bahnhof 'Gare du Nord' in Paris ist der verkehrsreichste in Europa.",
+            "Die U-Bahn von Budapest ist die älteste elektrisch betriebene U-Bahn auf dem europäischen Festland (1896).",
+            "Einige Stationen der Moskauer U-Bahn sind so prunkvoll mit Marmor, Mosaiken und Kronleuchtern ausgestattet, dass sie 'unterirdische Paläste' genannt werden.",
+            "Die U-Bahn in Kopenhagen ist 24/7 in Betrieb und fährt fahrerlos.",
+            "Der längste U-Bahn-Tunnel der Welt ist der der Linie 3 in Guangzhou, China, mit einer Länge von 60,4 km.",
+            "Die U-Bahn von Taipeh (Taiwan) ist bekannt für ihre Sauberkeit und Pünktlichkeit.",
+            "In den Tunneln der U-Bahn von Singapur ist das Essen und Trinken von Durian-Früchten wegen ihres starken Geruchs streng verboten.",
+            "Die U-Bahn von Montreal hat wie die in Mexiko-Stadt Züge mit Gummireifen.",
+            "Die Station 'Westfriedhof' in München ist berühmt für ihre riesigen, farbigen Lampen, die eine einzigartige Atmosphäre schaffen.",
+            "Die U-Bahn in Washington D.C. ist bekannt für ihre beeindruckende, gewölbte Architektur aus Beton.",
+            "In der U-Bahn von Seoul sind die Sitze im Winter beheizt.",
+            "Die Linie 14 der Pariser Métro war die erste vollautomatische Linie der Stadt.",
+            "Die U-Bahn von Algier war die erste Metro im Maghreb.",
+            "Die 'Mail Rail' in London war eine fahrerlose Post-U-Bahn, die über 75 Jahre lang Briefe unter der Stadt transportierte und heute ein Museum ist.",
+            "Der U-Bahnhof 'Toledo' in Neapel wurde als schönster Europas ausgezeichnet und ist bekannt für sein beeindruckendes Lichtkunstwerk.",
+            "Die U-Bahn in Wien wird teilweise aus der Energie betrieben, die beim Bremsen der Züge zurückgewonnen wird (Rekuperation).",
+            "In einem U-Bahnhof in Berlin (Bülowstraße) gab es in den 70er Jahren einen Flohmarkt in einem stillgelegten Zug.",
+            "Die U-Bahn in Oslo fährt bis auf die Skipisten am Holmenkollen.",
+            "Die U-Bahn von Bilbao wurde vom berühmten Architekten Norman Foster entworfen und hat charakteristische Glaseingänge namens 'Fosteritos'.",
+            "Einige der Belüftungsgitter der New Yorker U-Bahn sind als kunstvolle Skulpturen getarnt.",
+            "Die U-Bahn von Vancouver (SkyTrain) ist eines der längsten vollautomatischen Nahverkehrssysteme der Welt.",
+            "Die U-Bahn von Bangkok hat spezielle Mönchssitze, die für buddhistische Mönche reserviert sind.",
+            "Die U-Bahn in Prag hat eine Station (Anděl), die mit Engeln und Teufeln dekoriert ist, ein Verweis auf den früheren Namen 'Moskevská'.",
+            "Die U-Bahn in Rotterdam hat einen oberirdischen Abschnitt, der durch ein Wohnhaus führt.",
+            "In der U-Bahn von Brüssel gibt es über 80 Kunstwerke, die in den Stationen permanent ausgestellt sind.",
+            "Die U-Bahn von Mailand ist bekannt für ihr klares und rationalistisches Design von Franco Albini und Bob Noorda.",
+            "Die U-Bahn in Warschau wurde erst 1995 eröffnet, obwohl die Planungen bereits in den 1920er Jahren begannen.",
+            "Die U-Bahn in Lissabon ist berühmt für ihre kunstvollen Kacheln (Azulejos) in den Stationen.",
+            "Die U-Bahn von Barcelona hat zwei verschiedene Spurweiten, was auf die unterschiedlichen Bahngesellschaften zurückgeht, die das Netz ursprünglich bauten.",
+            "Die U-Bahn in Jekaterinburg ist die kürzeste der Welt mit nur 7 Stationen.",
+            "Die U-Bahn in Mumbai wurde gebaut, um die notorisch überfüllten Vorortzüge zu entlasten.",
+            "Die U-Bahn in Teheran hat spezielle Waggons und Eingänge für Frauen, die getrennt reisen möchten.",
+            "Die U-Bahn in Kaohsiung (Taiwan) hat die größte Glasinstallation der Welt in der Station Formosa Boulevard.",
+            "Die U-Bahn in Hamburg (Hochbahn) fährt zu großen Teilen auf Viadukten und ist eine der ältesten in Deutschland.",
+            "Die U-Bahn in Nürnberg war die erste in Deutschland, die vollautomatisch fuhr.",
+            "Die U-Bahn von Rom ist relativ klein, da Bauarbeiten oft durch archäologische Funde verzögert werden.",
+            "Die U-Bahn in Amsterdam hat eine Linie, die unter dem Fluss IJ in einem Tunnel verläuft, der abgesenkt wurde.",
+            "Die U-Bahn in Los Angeles ist ein relativ junges System, das in einer Stadt gebaut wurde, die für ihre Autokultur bekannt ist.",
+            "Die U-Bahn in Kuala Lumpur hat die längste vollautomatische Linie der Welt.",
+            "Die U-Bahn in Kasan (Russland) hat Stationen, die nach berühmten tatarischen Dichtern und Schriftstellern benannt sind.",
+            "Die U-Bahn in Caracas (Venezuela) ist bekannt für ihre Kunstwerke und ihre Sauberkeit, trotz der wirtschaftlichen Schwierigkeiten des Landes.",
+            "Die U-Bahn in Lima (Peru) wurde in mehreren Phasen über einen Zeitraum von 30 Jahren gebaut.",
+            "Die U-Bahn in Incheon (Südkorea) ist mit der U-Bahn von Seoul verbunden und bildet eines der größten Metronetze der Welt.",
+            "Die U-Bahn in Palma de Mallorca ist eines der kleinsten Systeme in Europa und bedient hauptsächlich die Universität.",
+            "Die U-Bahn in Rennes (Frankreich) war eine der ersten vollautomatischen Metros der Welt (Typ VAL).",
+            "Die U-Bahn in Lausanne (Schweiz) ist eine der steilsten der Welt und überwindet erhebliche Höhenunterschiede.",
+            "Die U-Bahn in Brescia (Italien) ist wie Kopenhagen und Nürnberg fahrerlos.",
+            "Die U-Bahn in Thessaloniki wurde durch zahlreiche archäologische Funde aus der byzantinischen Zeit stark verzögert.",
+            "Die U-Bahn in Bangalore (Indien), auch 'Namma Metro' genannt, hat spezielle Waggons für Frauen und Kinder.",
+            "Die U-Bahn in Chennai (Indien) hat eine Mischung aus ober- und unterirdischen Strecken.",
+            "Die U-Bahn in Delhi ist eines der am schnellsten wachsenden Netze der Welt und verfügt über einen eigenen Flughafen-Express.",
+            "Die U-Bahn in Schiras (Iran) ist eine der neuesten im Nahen Osten.",
+            "Die U-Bahn in Ankara ist die zweitgrößte in der Türkei nach Istanbul.",
+            "Die U-Bahn in Izmir (Türkei) hat eine Linie, die entlang der Küste verläuft.",
+            "Die U-Bahn in Almaty (Kasachstan) ist bekannt für ihre kunstvollen Stationen, die die kasachische Kultur widerspiegeln.",
+            "Die U-Bahn in Taschkent (Usbekistan) war die erste in Zentralasien und ist für ihre einzigartige Architektur bekannt.",
+            "Die U-Bahn in Minsk (Belarus) hat Stationen, die im sowjetischen Stil dekoriert sind.",
+            "Die U-Bahn in Baku (Aserbaidschan) hat ein kompliziertes Liniensystem, bei dem sich mehrere Linien die gleichen Gleise teilen.",
+            "Die U-Bahn in Dnipro (Ukraine) hat nur eine Linie mit 6 Stationen.",
+            "Die U-Bahn in Catania (Italien) ist eine der kürzesten in Europa und hat oft mit Überschwemmungen durch den nahegelegenen Vulkan Ätna zu kämpfen.",
+            "Die U-Bahn in Genua (Italien) hat eine sehr ungewöhnliche Topographie mit vielen Aufzügen und Schrägaufzügen, um die hügelige Stadt zu erschließen.",
+            "Die U-Bahn in Neapel hat neben der berühmten Toledo-Station viele weitere 'Kunststationen'.",
+            "Die U-Bahn in Turin (Italien) war die erste vollautomatische in Italien.",
+            "Die U-Bahn in Helsinki ist die nördlichste der Welt.",
+            "Die U-Bahn von Maracaibo (Venezuela) ist eigentlich eine Stadtbahn, wird aber als Metro bezeichnet.",
+            "Die U-Bahn von Valencia (Spanien) ist eine Mischung aus U-Bahn und Straßenbahn.",
+            "Die U-Bahn in Chongqing (China) ist einzigartig, da sie durch ein 19-stöckiges Wohnhaus fährt, mit einer eigenen Station im Gebäude."
+        ];
+
+        let factTimeout;
+        function showRandomFact() {
+            if (factTimeout) {
+                clearTimeout(factTimeout);
+            }
+            const fact = subwayFacts[Math.floor(Math.random() * subwayFacts.length)];
+            ui.factDisplay.innerText = fact;
+            ui.factDisplay.classList.remove('hidden');
+
+            factTimeout = setTimeout(() => {
+                ui.factDisplay.classList.add('hidden');
+            }, 15000);
+        }
+
         // --- Globale Variablen ---
         let scene, camera, renderer, clock, stats; 
         let driverCab; 
@@ -389,7 +520,10 @@
             pauseMenu: document.getElementById('pause-menu'),
             pauseButton: document.getElementById('pause-button'),
             resumeButton: document.getElementById('resume-button'),
-            restartButton: document.getElementById('restart-button')
+            restartButton: document.getElementById('restart-button'),
+            saveButton: document.getElementById('save-button'),
+            loadButton: document.getElementById('load-button'),
+            factDisplay: document.getElementById('fact-display')
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
@@ -1434,13 +1568,108 @@
             ui.restartButton.addEventListener('click', () => {
                 window.location.reload();
             });
+            ui.saveButton.addEventListener('click', saveGame);
+            ui.loadButton.addEventListener('click', loadGame);
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'p' || e.key === 'Escape') {
                     togglePause();
                 }
             });
         }
-        
+
+        function saveGame() {
+            try {
+                const gameState = {
+                    playerDistance: window.playerDistance,
+                    score: window.score,
+                    boosterPurchased: boosterPurchased,
+                    signalsState: signals.map(s => ({ distance: s.distance, color: s.color, pointsAwarded: s.pointsAwarded })),
+                    stationsState: stations.map(st => ({ distance: st.distance, visited: st.visited })),
+                    maxSpeed: MAX_SPEED
+                };
+
+                const gameStateJSON = JSON.stringify(gameState);
+                localStorage.setItem('pocketSubwaySave', gameStateJSON);
+
+                console.log('Spielstand gespeichert!');
+                const originalText = ui.saveButton.innerText;
+                ui.saveButton.innerText = 'Gespeichert!';
+                ui.saveButton.disabled = true;
+                setTimeout(() => {
+                    ui.saveButton.innerText = originalText;
+                    ui.saveButton.disabled = false;
+                }, 2000);
+
+            } catch (error) {
+                console.error('Fehler beim Speichern des Spiels:', error);
+                const originalText = ui.saveButton.innerText;
+                ui.saveButton.innerText = 'Fehler!';
+                setTimeout(() => {
+                    ui.saveButton.innerText = originalText;
+                }, 2000);
+            }
+        }
+
+        function loadGame() {
+            try {
+                const gameStateJSON = localStorage.getItem('pocketSubwaySave');
+                if (!gameStateJSON) {
+                    console.warn('Kein Spielstand gefunden.');
+                    const originalText = ui.loadButton.innerText;
+                    ui.loadButton.innerText = 'Nichts gefunden!';
+                     setTimeout(() => {
+                        ui.loadButton.innerText = originalText;
+                    }, 2000);
+                    return;
+                }
+
+                const gameState = JSON.parse(gameStateJSON);
+
+                // Spielzustand wiederherstellen
+                window.playerDistance = gameState.playerDistance;
+                window.score = gameState.score;
+                boosterPurchased = gameState.boosterPurchased;
+                MAX_SPEED = gameState.maxSpeed || 33.3;
+
+                // Synchronisiere den Zustand der Signale
+                gameState.signalsState.forEach(savedSignal => {
+                    const gameSignal = signals.find(s => s.distance === savedSignal.distance);
+                    if (gameSignal) {
+                        gameSignal.color = savedSignal.color;
+                        gameSignal.pointsAwarded = savedSignal.pointsAwarded;
+                        updateSignalVisuals(gameSignal); // Visuelle Darstellung aktualisieren
+                    }
+                });
+
+                // Synchronisiere den Zustand der Stationen
+                gameState.stationsState.forEach(savedStation => {
+                    const gameStation = stations.find(s => s.distance === savedStation.distance);
+                    if (gameStation) {
+                        gameStation.visited = savedStation.visited;
+                    }
+                });
+
+                console.log('Spielstand geladen!');
+                const originalText = ui.loadButton.innerText;
+                ui.loadButton.innerText = 'Geladen!';
+                ui.loadButton.disabled = true;
+                setTimeout(() => {
+                    ui.loadButton.innerText = originalText;
+                    ui.loadButton.disabled = false;
+                    togglePause(); // Weiterspielen
+                }, 1000);
+
+
+            } catch (error) {
+                console.error('Fehler beim Laden des Spiels:', error);
+                 const originalText = ui.loadButton.innerText;
+                ui.loadButton.innerText = 'Fehler!';
+                 setTimeout(() => {
+                    ui.loadButton.innerText = originalText;
+                }, 2000);
+            }
+        }
+
         function togglePause() {
             isPaused = !isPaused;
 
@@ -1667,6 +1896,7 @@
                     if (currentStation && !currentStation.visited) {
                         window.score += 100;
                         currentStation.visited = true;
+                        showRandomFact();
 
                         const stationName = currentStation.name;
                         ui.statusMessage.dataset.station = stationName;
