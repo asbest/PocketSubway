@@ -486,7 +486,7 @@
         const MAX_BRAKE_FORCE = 200000; 
         const FRICTION_COEFFICIENT = 150; 
         const GRAVITY = 9.81;
-        let MAX_SPEED = 33.3; // 120 km/h in m/s
+        let MAX_SPEED = 25; // 90 km/h in m/s
 
         // Strecken-Generierung
         const stations = [];
@@ -1558,10 +1558,10 @@
             });
 
             ui.boosterButton.addEventListener('click', () => {
-                if (window.score >= 100 && !boosterPurchased) {
+                if (window.score >= 100) {
                     window.score -= 100;
-                    boosterPurchased = true;
-                    MAX_SPEED = 55.6; // 200 km/h
+                    //boosterPurchased = true;
+                    MAX_SPEED *= 1.33;
                     ui.boosterButton.classList.add('hidden');
                 }
             });
@@ -1595,7 +1595,7 @@
                     score: window.score,
 
                     // Spiel-Konfiguration
-                    boosterPurchased: boosterPurchased,
+                    //boosterPurchased: boosterPurchased,
                     maxSpeed: MAX_SPEED,
 
                     // Streckendaten
@@ -2100,7 +2100,7 @@
             ui.speedDisplay.innerText = (window.playerSpeed * 3.6).toFixed(0);
             ui.scoreDisplay.innerText = score;
 
-            if (score >= 100 && !boosterPurchased) {
+            if (score < 100) {
                 ui.boosterButton.classList.remove('hidden');
             } else {
                 ui.boosterButton.classList.add('hidden');
