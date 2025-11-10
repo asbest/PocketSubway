@@ -1579,6 +1579,31 @@
                     togglePause();
                 }
             });
+
+            // Cheat code: 10 schnelle Klicks auf den Punktestand für +1000 Punkte
+            let scoreClickCount = 0;
+            let lastScoreClickTime = 0;
+            ui.scoreDisplay.parentElement.addEventListener('click', () => { // Listener auf dem Elternelement für eine größere Klickfläche
+                const now = Date.now();
+                if (now - lastScoreClickTime > 400) { // Zeitfenster von 400ms
+                    scoreClickCount = 0;
+                }
+                lastScoreClickTime = now;
+                scoreClickCount++;
+
+                if (scoreClickCount >= 10) {
+                    window.score += 1000;
+                    scoreClickCount = 0;
+
+                    // Visuelles Feedback
+                    const scoreContainer = ui.scoreDisplay.parentElement;
+                    scoreContainer.style.transition = 'transform 0.1s ease-in-out';
+                    scoreContainer.style.transform = 'scale(1.2)';
+                    setTimeout(() => {
+                        scoreContainer.style.transform = 'scale(1)';
+                    }, 100);
+                }
+            });
         }
 
         function saveGame() {
