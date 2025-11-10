@@ -127,7 +127,7 @@
             <div class="flex space-x-8 bg-black bg-opacity-25 p-4 rounded-lg shadow-lg items-end">
                 <div class="flex flex-col items-center">
                     <!-- Booster Icon -->
-                    <div id="booster-button" class="hidden cursor-pointer bg-blue-500 hover:bg-blue-400 rounded-full w-10 h-10 flex items-center justify-center transition-all duration-300 transform hover:scale-110 mb-2" title="Max Geschwindigkeit auf 200 km/h erhöhen (kostet 100 Punkte)">
+                    <div id="booster-button" class="hidden cursor-pointer bg-blue-500 hover:bg-blue-400 rounded-full w-10 h-10 flex items-center justify-center transition-all duration-300 transform hover:scale-110 mb-2" title="Max Geschwindigkeit erhöhen (kostet 100 Punkte)">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
@@ -1562,7 +1562,7 @@
                     window.score -= 100;
                     //boosterPurchased = true;
                     MAX_SPEED *= 1.33;
-                    ui.boosterButton.classList.add('hidden');
+                    //ui.boosterButton.classList.add('hidden');
                 }
             });
 
@@ -2100,7 +2100,7 @@
             ui.speedDisplay.innerText = (window.playerSpeed * 3.6).toFixed(0);
             ui.scoreDisplay.innerText = score;
 
-            if (score < 100) {
+            if (score >= 100) {
                 ui.boosterButton.classList.remove('hidden');
             } else {
                 ui.boosterButton.classList.add('hidden');
