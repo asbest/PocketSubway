@@ -554,7 +554,11 @@
             // Renderer
             const container = document.getElementById('canvas-container');
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            const width = Math.min(window.innerWidth, 1920);
+            const height = Math.min(window.innerHeight, 1080);
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
             renderer.shadowMap.enabled = false; 
             container.appendChild(renderer.domElement);
@@ -579,11 +583,11 @@
             createProceduralMaterials();
             
             // Stats initialisieren und hinzufügen - FPS Counter wird nicht mehr genutzt
-            // stats = new Stats();
-            // stats.domElement.style.position = 'absolute'; 
-            // stats.domElement.style.left = '8px';
-            // stats.domElement.style.top = '8px';
-            // ui.statsContainer.appendChild(stats.dom);
+            stats = new Stats();
+            stats.domElement.style.position = 'absolute';
+            stats.domElement.style.left = '8px';
+            stats.domElement.style.top = '8px';
+            ui.statsContainer.appendChild(stats.dom);
 
             // Event-Listener
             window.addEventListener('resize', onWindowResize);
@@ -1792,7 +1796,7 @@
         // --- Game Loop ---
         function animate() {
             requestAnimationFrame(animate);
-            // stats.begin(); // Entfernt
+            stats.begin();
             
             if (isPaused) {
                 // Im pausierten Zustand nichts tun, außer Rendern, um das Menü anzuzeigen
@@ -1810,7 +1814,7 @@
 
             renderer.render(scene, camera);
             
-            // stats.end(); // Entfernt
+            stats.end();
         }
 
         // --- Physik-Update & Sound ---
@@ -2155,9 +2159,11 @@
 
         // --- Fenster-Resize ---
         function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
+            const width = Math.min(window.innerWidth, 1920);
+            const height = Math.min(window.innerHeight, 1080);
+            camera.aspect = width / height;
             camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setSize(width, height);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
         }
 
