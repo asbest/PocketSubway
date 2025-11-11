@@ -555,7 +555,7 @@
             const container = document.getElementById('canvas-container');
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
             renderer.shadowMap.enabled = false; 
             container.appendChild(renderer.domElement);
 
@@ -2158,7 +2158,7 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
         }
 
         // --- Start ---
