@@ -491,8 +491,6 @@
         // Strecken-Generierung
         const stations = [];
         const signals = [];
-        const switchInfo = [];
-        let branchCurves = [];
         window.signals = signals; // Exposed for verification
         const NUM_SEGMENTS = 50;
         const MIN_SEGMENT_LENGTH = 300; 
@@ -862,8 +860,6 @@
             }
             
             let lastWasStation = true;
-            let stationCounter = 1; // Start at 1 because we already created the first station
-            let createSwitch = false;
             let nextSignalDistance = 1000 + Math.random() * 1000;
 
             // --- 3. Restliche Strecke prozedural generieren ---
@@ -881,60 +877,11 @@
                         visited: false
                     });
                     lastWasStation = true;
-                    stationCounter++;
-                    if (stationCounter >= 2) {
-                        createSwitch = true;
-                        stationCounter = 0;
-                    }
                 } else {
                     segmentLength = MIN_SEGMENT_LENGTH + Math.random() * (MAX_SEGMENT_LENGTH - MIN_SEGMENT_LENGTH);
                     targetCurvature = (Math.random() - 0.5) * 2 * MAX_CURVATURE;
                     targetInclineRate = (Math.random() - 0.5) * 2 * MAX_INCLINE_RATE;
                     lastWasStation = false;
-
-                    // HIER DIE WEICHE EINFÜGEN, WENN GEPLANT
-                    if (createSwitch && i < NUM_SEGMENTS - 2) { // Verhindert Weichen kurz vor Ende
-                        console.log(`Creating a switch at distance: ${totalTrackLength}`);
-
-                        const switchDistance = totalTrackLength;
-                        const branchLength = 50; // Gesamtlänge der Abzweigung
-                        const branchAngle = (Math.random() > 0.5 ? 1 : -1) * (Math.PI / 12); // +/- 15 Grad
-                        const mainGoesBranch = Math.random() < 0.5;
-
-                        switchInfo.push({
-                            distance: switchDistance,
-                            mainGoesBranch: mainGoesBranch,
-                            branchAngle: branchAngle,
-                            length: 100 // Länge der "Höhle"
-                        });
-
-                        // Generiere die Punkte für die Abzweigung
-                        const branchPoints = [];
-                        let branchPos = currentPos.clone();
-                        let branchDir = currentDir.clone();
-                        let branchCurvature = 0;
-                        const targetBranchCurvature = branchAngle / branchLength;
-
-                        for(let b = 0; b < branchLength; b++) {
-                            branchCurvature += (targetBranchCurvature - branchCurvature) * 0.1;
-                            tempQuat.setFromAxisAngle(up, branchCurvature);
-                            branchDir.applyQuaternion(tempQuat);
-                            branchPos.add(branchDir);
-                            branchPoints.push(branchPos.clone());
-                        }
-                        branchCurves.push(new THREE.CatmullRomCurve3(branchPoints));
-
-                        // Wenn die Hauptstrecke abbiegt, müssen wir die Punkte anpassen
-                        if (mainGoesBranch) {
-                            points.pop(); // Letzten Punkt (Weichenpunkt) entfernen
-                            points.push(...branchPoints); // Abzweigungspunkte hinzufügen
-                            currentPos = branchPos;
-                            currentDir = branchDir;
-                            totalTrackLength += branchLength -1;
-                        }
-
-                        createSwitch = false; // Reset flag
-                    }
                 }
 
                 // Punkte für dieses Segment generieren (1 Punkt pro Meter)
@@ -1051,58 +998,6 @@
             // 1. Der Tunnel
             const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
             const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 32, false);
-
-            // --- Tunnel an Weichen öffnen (optimiert) ---
-            const tubeSegments = tunnelGeometry.parameters.tubularSegments;
-            const radialSegments = tunnelGeometry.parameters.radialSegments;
-            const positionArray = tunnelGeometry.attributes.position.array;
-            const P = new THREE.Vector3();
-            const B = new THREE.Vector3();
-            const N = new THREE.Vector3();
-
-            switchInfo.forEach(info => {
-                const switchStartT = (info.distance - 20) / totalTrackLength;
-                const switchEndT = (info.distance + info.length) / totalTrackLength;
-
-                const startSegment = Math.floor(switchStartT * tubeSegments);
-                const endSegment = Math.ceil(switchEndT * tubeSegments);
-
-                for (let i = startSegment; i <= endSegment; i++) {
-                    const t = i / tubeSegments;
-                    // N, B, P werden von der TubeGeometry's internen Frames-Berechnung geholt
-                    const frames = tunnelCurve.computeFrenetFrames(tubeSegments);
-                    N.copy(frames.normals[i]);
-                    B.copy(frames.binormals[i]);
-                    P.copy(tunnelCurve.getPointAt(t));
-
-                    const progress = (i - startSegment) / (endSegment - startSegment);
-                    // Sanfterer Übergang mit einer ease-in-out-Funktion
-                    const progressEased = 0.5 - 0.5 * Math.cos(progress * Math.PI);
-                    const scaleFactor = 1.0 + progressEased * 1.5; // Auf 250% anwachsen
-
-                    for (let j = 0; j <= radialSegments; j++) {
-                        const v = j / radialSegments;
-                        const angle = v * Math.PI * 2;
-                        const cx = -tunnelRadius * Math.cos(angle);
-                        const cy = tunnelRadius * Math.sin(angle);
-
-                        const index = (i * (radialSegments + 1) + j) * 3;
-
-                        const vertex = new THREE.Vector3();
-                        vertex.x = P.x + (cx * N.x + cy * B.x) * scaleFactor;
-                        vertex.y = P.y + (cx * N.y + cy * B.y) * scaleFactor;
-                        vertex.z = P.z + (cx * N.z + cy * B.z) * scaleFactor;
-
-                        positionArray[index] = vertex.x;
-                        positionArray[index + 1] = vertex.y;
-                        positionArray[index + 2] = vertex.z;
-                    }
-                }
-            });
-            tunnelGeometry.attributes.position.needsUpdate = true;
-            tunnelGeometry.computeVertexNormals();
-
-
             const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
             trackGroup.add(tunnelMesh);
 
@@ -1112,103 +1007,58 @@
             // Tunneldetails (Kabel, Rohre) hinzufügen
             createTunnelDetails(curve, tunnelOffsetY);
 
-            // 2. Schienen, Schwellen und Gleisbett für die Hauptstrecke
-            createTrackDetails(curve, totalTrackLength);
-
-            // 3. Geometrie für alle Abzweigungen erstellen
-            branchCurves.forEach(branchCurve => {
-                const branchLength = branchCurve.getLength();
-                createTrackDetails(branchCurve, branchLength);
-
-                // Erstelle einen separaten Tunnel für die Abzweigung
-                const branchTunnelPoints = [];
-                const numBranchTunnelPoints = Math.min(Math.floor(branchLength), 50); // Nur die ersten 50m
-
-                for (let i = 15; i < numBranchTunnelPoints; i++) { // Etwas später starten, um Überlappung in der "Höhle" zu vermeiden
-                     const t = i / branchLength;
-                     const pos = branchCurve.getPointAt(t);
-                     const tangent = branchCurve.getTangentAt(t);
-                     const up = new THREE.Vector3(0, 1, 0);
-                     const binormal = new THREE.Vector3().crossVectors(up, tangent).normalize();
-                     const normal = new THREE.Vector3().crossVectors(tangent, binormal).normalize();
-                     const tunnelCenterPos = pos.clone().add(normal.clone().multiplyScalar(tunnelOffsetY));
-                     branchTunnelPoints.push(tunnelCenterPos);
-                }
-
-                if (branchTunnelPoints.length > 1) {
-                    const tunnelCurve = new THREE.CatmullRomCurve3(branchTunnelPoints);
-                    const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, 100, tunnelRadius, 32, false);
-                    const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
-                    trackGroup.add(tunnelMesh);
-                }
-            });
-        }
-
-        // HILFSFUNKTION zum Erstellen von Schienen, Schwellen, etc. für eine gegebene Kurve
-        function createTrackDetails(curve, curveLength) {
-             const railPointsLeft = [];
-            const railPointsRight = [];
-            const railOffset = 1.0;
-            const railHeight = 0.1;
-
-            const up = new THREE.Vector3(0, 1, 0);
-            const tangent = new THREE.Vector3();
-            const binormal = new THREE.Vector3();
-            const normal = new THREE.Vector3();
-            const pos = new THREE.Vector3();
-
-            const numPoints = Math.floor(curveLength);
-            for (let i = 0; i < numPoints; i++) {
-                const t = i / numPoints;
-                curve.getPointAt(t, pos);
-                curve.getTangentAt(t, tangent);
-
-                binormal.crossVectors(up, tangent).normalize();
-                normal.crossVectors(tangent, binormal).normalize();
-
-                const posLeft = pos.clone().add(binormal.clone().multiplyScalar(railOffset)).add(normal.clone().multiplyScalar(railHeight));
-                const posRight = pos.clone().add(binormal.clone().multiplyScalar(-railOffset)).add(normal.clone().multiplyScalar(railHeight));
-                railPointsLeft.push(posLeft);
-                railPointsRight.push(posRight);
-            }
-
+            // 2. Schienen
             const railCurveLeft = new THREE.CatmullRomCurve3(railPointsLeft);
             const railCurveRight = new THREE.CatmullRomCurve3(railPointsRight);
-            const railGeo = new THREE.TubeGeometry(railCurveLeft, numPoints, 0.1, 4, false);
 
+            const railGeo = new THREE.TubeGeometry(railCurveLeft, TUBE_SEGMENTS, 0.1, 4, false);
             const railMeshLeft = new THREE.Mesh(railGeo, railMaterial);
-            const railMeshRight = new THREE.Mesh(railGeo.clone().copy(new THREE.TubeGeometry(railCurveRight, numPoints, 0.1, 4, false)), railMaterial);
-            trackGroup.add(railMeshLeft, railMeshRight);
+            const railMeshRight = new THREE.Mesh(railGeo.clone().copy(new THREE.TubeGeometry(railCurveRight, TUBE_SEGMENTS, 0.1, 4, false)), railMaterial);
             
-            // Schwellen
+            trackGroup.add(railMeshLeft);
+            trackGroup.add(railMeshRight);
+
+
+            // 4. Schwellen
             const tieGeo = new THREE.BoxGeometry(2.5, 0.15, 0.3);
-            const tieCount = Math.floor(curveLength / 1.5);
+            const tieCount = Math.floor(totalTrackLength / 1.5);
             const tieMesh = new THREE.InstancedMesh(tieGeo, tieMaterial, tieCount);
 
             const dummy = new THREE.Object3D();
             const lookAtPos = new THREE.Vector3();
+
             for (let i = 0; i < tieCount; i++) {
-                const t = i / tieCount;
+                const t = (i / tieCount);
                 const t_next = (i + 1) / tieCount;
+
                 curve.getPointAt(t, dummy.position);
                 curve.getPointAt(t_next, lookAtPos);
+
+                // Schwellen sind bei y=0 zentriert (halbe Dicke nach unten)
                 dummy.position.y -= 0.075;
+
                 dummy.lookAt(lookAtPos);
+
                 dummy.updateMatrix();
                 tieMesh.setMatrixAt(i, dummy.matrix);
             }
             tieMesh.instanceMatrix.needsUpdate = true;
             trackGroup.add(tieMesh);
 
-            // Gleisbett
+            // 5. Gleisbett
             const trackbedGeo = new THREE.BoxGeometry(3.0, 0.2, 1.5);
-            const trackbedMesh = new THREE.InstancedMesh(trackbedGeo, trackbedMaterial, tieCount);
+            const trackbedMesh = new THREE.InstancedMesh(trackbedGeo, trackbedMaterial, tieCount); // Gleiche Anzahl wie Schwellen
+
             for (let i = 0; i < tieCount; i++) {
-                const t = i / tieCount;
+                const t = (i / tieCount);
                 const t_next = (i + 1) / tieCount;
+
                 curve.getPointAt(t, dummy.position);
                 curve.getPointAt(t_next, lookAtPos);
+
+                // Gleisbett liegt unter den Schwellen
                 dummy.position.y -= 0.25;
+
                 dummy.lookAt(lookAtPos);
                 dummy.updateMatrix();
                 trackbedMesh.setMatrixAt(i, dummy.matrix);
