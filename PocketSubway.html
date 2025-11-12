@@ -283,45 +283,6 @@
             return new THREE.CanvasTexture(canvas);
         }
 
-        function generateBrickTexture(width, height) {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-
-            const brickWidth = 60;
-            const brickHeight = 20;
-            const mortarThickness = 4;
-            const brickColor = '#8B4513'; // SaddleBrown
-            const mortarColor = '#808080'; // Gray
-
-            // Hintergrund (Fugen)
-            ctx.fillStyle = mortarColor;
-            ctx.fillRect(0, 0, width, height);
-
-            ctx.fillStyle = brickColor;
-
-            for (let y = 0; y < height; y += brickHeight + mortarThickness) {
-                for (let x = 0; x < width; x += brickWidth + mortarThickness) {
-                    let offsetX = 0;
-                    // Jede zweite Reihe versetzen
-                    if ((y / (brickHeight + mortarThickness)) % 2 === 1) {
-                        offsetX = -(brickWidth + mortarThickness) / 2;
-                    }
-
-                    // Zeichne Ziegelstein
-                    ctx.fillRect(x + offsetX, y, brickWidth, brickHeight);
-                    // Um das Muster nahtlos zu machen, zeichne auch den Teil, der links/rechts herausragt
-                     if (offsetX !== 0) {
-                        ctx.fillRect(x + offsetX + width, y, brickWidth, brickHeight);
-                    }
-
-                }
-            }
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
-            return texture;
-        }
 
         function generateFunnyStationName() {
             const prefixes = ['Groß', 'Klein', 'Alt', 'Neu', 'Ober', 'Unter', 'Bad', 'Sankt', 'Prost'];
@@ -499,7 +460,7 @@
         const MAX_CURVATURE = 0.001; 
         const MAX_INCLINE_RATE = 0.0005; 
         const MAX_GRADE = 0.025; 
-        const TUBE_SEGMENTS = 900;
+        const TUBE_SEGMENTS = 300;
 
         // DOM-Elemente
         const ui = {
@@ -667,18 +628,23 @@
         // --- Prozedurale Materialerzeugung ---
         function createProceduralMaterials() {
              // Tunnel Material
-            const brickTexture = generateBrickTexture(256, 256);
-            brickTexture.wrapS = THREE.RepeatWrapping;
-            brickTexture.wrapT = THREE.RepeatWrapping;
-            // Die Wiederholung in Y-Richtung (Umfang) wird auf 40 gesetzt für eine realistischere Ziegelhöhe.
-            // Die X-Wiederholung (Länge) wird nach der Streckengenerierung basierend auf der echten Länge berechnet.
-            brickTexture.repeat.set(1, 40);
+            const tunnelTexture = generateNoiseTexture(256, 256, {
+                scale: 100,
+                octaves: 2,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                color1: 0x444444,
+                color2: 0x222222
+            });
+            tunnelTexture.wrapS = THREE.RepeatWrapping;
+            tunnelTexture.wrapT = THREE.RepeatWrapping;
+            tunnelTexture.repeat.set(1, 40); // Set a high repeat for the circumference
 
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
-                map: brickTexture,
+                map: tunnelTexture,
                 side: THREE.BackSide, 
-                roughness: 0.9,
-                metalness: 0.05
+                roughness: 0.8,
+                metalness: 0.1
             });
 
             // Schienen Material
@@ -947,10 +913,10 @@
             // Signale erstellen
             createSignals(trackCurve);
 
-            // Passe die Wiederholung der Ziegeltextur an die tatsächliche Streckenlänge an
+            // Passe die Wiederholung der Tunneltextur an die tatsächliche Streckenlänge an
             const tunnelCircumference = 2 * Math.PI * 5.0; // tunnelRadius = 5.0
             const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
-            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Assume square bricks for now
+            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Assume square-ish noise pixels
             tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
             tunnelMaterial.map.needsUpdate = true;
         }
