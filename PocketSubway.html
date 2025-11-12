@@ -499,7 +499,7 @@
         const MAX_CURVATURE = 0.001; 
         const MAX_INCLINE_RATE = 0.0005; 
         const MAX_GRADE = 0.025; 
-        const TUBE_SEGMENTS = 600; 
+        const TUBE_SEGMENTS = 900;
 
         // DOM-Elemente
         const ui = {
@@ -764,7 +764,7 @@
             // Gleisbett (Beton) Material
             const trackbedTexture = generateNoiseTexture(256, 256, {
                 scale: 80,
-                octaves: 4,
+                octaves: 2,
                 persistence: 0.3,
                 lacunarity: 2.5,
                 color1: 0x888888,
@@ -1279,20 +1279,39 @@
                 stationLight4.isStationLight = true;
                 stationGroup.add(stationLight4);
 
-                // --- Personen hinzufügen ---
-                const numPeople = Math.floor(Math.random() * 8) + 4; // Etwas weniger, da komplexer
+                // --- Personen hinzufügen (Optimiert mit InstancedMesh) ---
+                const numPeoplePerSide = Math.floor(Math.random() * 6) + 3;
+                const totalPeople = numPeoplePerSide * 2;
 
-                // Geometrien für Personen - detaillierter
+                // Geometrien einmal erstellen
                 const headGeo = new THREE.SphereGeometry(0.18, 16, 12);
-                const torsoGeo = new THREE.CylinderGeometry(0.2, 0.3, 0.6, 12); // Oben (Schultern) breiter
+                const torsoGeo = new THREE.CylinderGeometry(0.2, 0.3, 0.6, 12);
                 const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.75, 8);
                 const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.65, 8);
                 const footGeo = new THREE.BoxGeometry(0.18, 0.08, 0.3);
 
                 // Material-Paletten
-                const skinTones = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0xffdbac];
-                const shirtColors = [0x1e88e5, 0xd81b60, 0x004d40, 0xffc107, 0x6d4c41, 0x455a64, 0xf5f5f5, 0x212121];
-                const pantsColors = [0x212121, 0x37474f, 0x0d47a1, 0x5d4037, 0x1b5e20];
+                const skinTones = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0xffdbac].map(c => new THREE.Color(c));
+                const shirtColors = [0x1e88e5, 0xd81b60, 0x004d40, 0xffc107, 0x6d4c41, 0x455a64, 0xf5f5f5, 0x212121].map(c => new THREE.Color(c));
+                const pantsColors = [0x212121, 0x37474f, 0x0d47a1, 0x5d4037, 0x1b5e20].map(c => new THREE.Color(c));
+
+                // Instanced Meshes für jeden Körperteil
+                const bodyPartMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8, vertexColors: false });
+                const shoesMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
+
+                const headMesh = new THREE.InstancedMesh(headGeo, bodyPartMaterial.clone(), totalPeople);
+                const torsoMesh = new THREE.InstancedMesh(torsoGeo, bodyPartMaterial.clone(), totalPeople);
+                const armLeftMesh = new THREE.InstancedMesh(armGeo, bodyPartMaterial.clone(), totalPeople);
+                const armRightMesh = new THREE.InstancedMesh(armGeo, bodyPartMaterial.clone(), totalPeople);
+                const legLeftMesh = new THREE.InstancedMesh(legGeo, bodyPartMaterial.clone(), totalPeople);
+                const legRightMesh = new THREE.InstancedMesh(legGeo, bodyPartMaterial.clone(), totalPeople);
+                const footLeftMesh = new THREE.InstancedMesh(footGeo, shoesMaterial, totalPeople);
+                const footRightMesh = new THREE.InstancedMesh(footGeo, shoesMaterial, totalPeople);
+
+                stationGroup.add(headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh);
+
+                const dummy = new THREE.Object3D();
+                const tempMatrix = new THREE.Matrix4();
 
                 const minXRelativeFromEdge = 0.3; 
                 const maxXRelativeFromEdge = 1.0; 
@@ -1301,68 +1320,66 @@
                 const minZRelative = -station.length / 2 + 2;
                 const maxZRelative = station.length / 2 - 2;
 
-                for (let j = 0; j < numPeople; j++) {
-                    const personGroup = new THREE.Group();
-
-                    // Erstelle individuelle Materialien für diese Person
-                    const skinMat = new THREE.MeshStandardMaterial({ color: skinTones[Math.floor(Math.random() * skinTones.length)], roughness: 0.8 });
-                    const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColors[Math.floor(Math.random() * shirtColors.length)], roughness: 0.9 });
-                    const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColors[Math.floor(Math.random() * pantsColors.length)], roughness: 0.8 });
-                    const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
+                for (let i = 0; i < totalPeople; i++) {
+                    // Farben pro Instanz
+                    const skinColor = skinTones[Math.floor(Math.random() * skinTones.length)];
+                    const shirtColor = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+                    const pantsColor = pantsColors[Math.floor(Math.random() * pantsColors.length)];
                     
-                    // Kopf
-                    const head = new THREE.Mesh(headGeo, skinMat);
-                    head.position.y = 1.6;
-                    personGroup.add(head);
+                    headMesh.setColorAt(i, skinColor);
+                    armLeftMesh.setColorAt(i, skinColor);
+                    armRightMesh.setColorAt(i, skinColor);
+                    torsoMesh.setColorAt(i, shirtColor);
+                    legLeftMesh.setColorAt(i, pantsColor);
+                    legRightMesh.setColorAt(i, pantsColor);
 
-                    // Körper (Torso)
-                    const torso = new THREE.Mesh(torsoGeo, shirtMat);
-                    torso.position.y = 1.15;
-                    personGroup.add(torso);
-
-                    // Arme
-                    const armLeft = new THREE.Mesh(armGeo, skinMat);
-                    armLeft.position.set(-0.35, 1.3, 0);
-                    armLeft.rotation.z = Math.PI / 16;
-                    personGroup.add(armLeft);
-
-                    const armRight = new THREE.Mesh(armGeo, skinMat);
-                    armRight.position.set(0.35, 1.3, 0);
-                    armRight.rotation.z = -Math.PI / 16;
-                    personGroup.add(armRight);
-
-                    // Beine
-                    const legLeft = new THREE.Mesh(legGeo, pantsMat);
-                    legLeft.position.set(-0.12, 0.45, 0);
-                    personGroup.add(legLeft);
-
-                    const legRight = new THREE.Mesh(legGeo, pantsMat);
-                    legRight.position.set(0.12, 0.45, 0);
-                    personGroup.add(legRight);
-
-                    // Füße
-                    const footLeft = new THREE.Mesh(footGeo, shoesMat);
-                    footLeft.position.set(-0.12, 0.04, 0.05);
-                    personGroup.add(footLeft);
-
-                    const footRight = new THREE.Mesh(footGeo, shoesMat);
-                    footRight.position.set(0.12, 0.04, 0.05);
-                    personGroup.add(footRight);
-
-                    // Zufällige Position auf dem Bahnsteig
-                    let randomXRelative = Math.random() * (maxXRelative - minXRelative) + minXRelative; 
-                    let randomZRelative = Math.random() * (maxZRelative - minZRelative) + minZRelative;
+                    // Position und Rotation der gesamten Person
+                    const onLeftSide = i < numPeoplePerSide;
+                    const randomXRelative = Math.random() * (maxXRelative - minXRelative) + minXRelative;
+                    const randomZRelative = Math.random() * (maxZRelative - minZRelative) + minZRelative;
                     
-                    personGroup.position.set(platformOffset + randomXRelative, platformHeight, randomZRelative); 
-                    personGroup.rotation.y = Math.random() * Math.PI * 2; 
-                    stationGroup.add(personGroup);
+                    dummy.position.set(
+                        onLeftSide ? platformOffset + randomXRelative : -(platformOffset + randomXRelative),
+                        platformHeight,
+                        randomZRelative
+                    );
+                    dummy.rotation.y = Math.random() * Math.PI * 2;
+                    dummy.updateMatrix();
 
-                    // Und für die rechte Seite (gespiegelt)
-                    const personGroupRight = personGroup.clone();
-                    personGroupRight.position.x = -(platformOffset + randomXRelative); 
-                    personGroupRight.rotation.y = Math.random() * Math.PI * 2;
-                    stationGroup.add(personGroupRight);
+                    // Anwenden der Transformation auf jeden Körperteil mit seiner relativen Position
+                    const setPartMatrix = (mesh, x, y, z, rotZ = 0) => {
+                        const partDummy = new THREE.Object3D();
+                        partDummy.position.set(x, y, z);
+                        partDummy.rotation.z = rotZ;
+                        partDummy.updateMatrix();
+                        mesh.setMatrixAt(i, tempMatrix.multiplyMatrices(dummy.matrix, partDummy.matrix));
+                    };
+
+                    setPartMatrix(headMesh, 0, 1.6, 0);
+                    setPartMatrix(torsoMesh, 0, 1.15, 0);
+                    setPartMatrix(armLeftMesh, -0.35, 1.3, 0, Math.PI / 16);
+                    setPartMatrix(armRightMesh, 0.35, 1.3, 0, -Math.PI / 16);
+                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0);
+                    setPartMatrix(legRightMesh, 0.12, 0.45, 0);
+                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05);
+                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05);
                 }
+
+                // Wichtig: Updates für Matrizen und Farben anstoßen
+                headMesh.instanceMatrix.needsUpdate = true;
+                headMesh.instanceColor.needsUpdate = true;
+                torsoMesh.instanceMatrix.needsUpdate = true;
+                torsoMesh.instanceColor.needsUpdate = true;
+                armLeftMesh.instanceMatrix.needsUpdate = true;
+                armLeftMesh.instanceColor.needsUpdate = true;
+                armRightMesh.instanceMatrix.needsUpdate = true;
+                armRightMesh.instanceColor.needsUpdate = true;
+                legLeftMesh.instanceMatrix.needsUpdate = true;
+                legLeftMesh.instanceColor.needsUpdate = true;
+                legRightMesh.instanceMatrix.needsUpdate = true;
+                legRightMesh.instanceColor.needsUpdate = true;
+                footLeftMesh.instanceMatrix.needsUpdate = true;
+                footRightMesh.instanceMatrix.needsUpdate = true;
             });
         }
 
