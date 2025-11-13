@@ -114,10 +114,12 @@
                                 <h2 class="text-xs font-semibold text-gray-400">PUNKTE</h2>
                                 <p id="score-display" class="text-xl font-bold font-mono">0</p>
                             </div>
-                            <div>
+                            <!--
+                             <div>
                                 <h2 class="text-xs font-semibold text-gray-400">PASSAGIERE</h2>
                                 <p id="passenger-display" class="text-xl font-bold font-mono">0</p>
                             </div>
+                             -->
                         </div>
                     </div>
                     <div class="bg-black bg-opacity-40 p-2 rounded-lg shadow-lg text-right">
@@ -490,7 +492,7 @@
         let currentStation = null;
         let previousStation = null;
         window.score = 0;
-        let passengers = 0;
+        //let passengers = 0;
         let scheduleTime = 0;
         let scheduleTimer = null;
         let boosterPurchased = false;
@@ -539,7 +541,7 @@
             saveButton: document.getElementById('save-button'),
             loadButton: document.getElementById('load-button'),
             factDisplay: document.getElementById('fact-display'),
-            passengerDisplay: document.getElementById('passenger-display'),
+            //passengerDisplay: document.getElementById('passenger-display'),
             scheduleDisplay: document.getElementById('schedule-display'),
             scheduleTime: document.getElementById('schedule-time')
         };
@@ -2062,10 +2064,10 @@
                             scheduleTime = 0;
                         }
 
-                        const arrivingPassengers = Math.floor(Math.random() * (passengers + 1));
-                        const departingPassengers = Math.floor(Math.random() * 10) + 5;
-                        passengers -= arrivingPassengers;
-                        passengers += departingPassengers;
+                        //const arrivingPassengers = Math.floor(Math.random() * (passengers + 1));
+                        //const departingPassengers = Math.floor(Math.random() * 10) + 5;
+                        //passengers -= arrivingPassengers;
+                        //passengers += departingPassengers;
 
                         window.score += 100;
                         currentStation.visited = true;
@@ -2225,7 +2227,7 @@
         function updateUI() {
             ui.speedDisplay.innerText = (window.playerSpeed * 3.6).toFixed(0);
             ui.scoreDisplay.innerText = score;
-            ui.passengerDisplay.innerText = passengers;
+            //ui.passengerDisplay.innerText = passengers;
 
             if (scheduleTimer) {
                 const minutes = Math.floor(scheduleTime / 60);
