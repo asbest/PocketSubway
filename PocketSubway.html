@@ -1289,9 +1289,9 @@
                 const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.75, 8);
                 const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.65, 8);
                 const footGeo = new THREE.BoxGeometry(0.18, 0.08, 0.3);
-                const hairGeo = new THREE.SphereGeometry(0.20, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+                const hairGeo = new THREE.SphereGeometry(0.22, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2); // Halbkugel für Haare
                 const eyeGeo = new THREE.SphereGeometry(0.03, 8, 8);
-                const mouthGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.02, 8);
+                const mouthGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.02, 12, 1, false, 0, Math.PI); // Halb-Zylinder für Mund
 
 
                 // Material-Paletten
@@ -1301,9 +1301,10 @@
                 const hairColors = [0x090806, 0x2C222B, 0x71635A, 0xB7A69E, 0xD6C4C2, 0x9D6A3C, 0x6A4E3A].map(c => new THREE.Color(c));
 
                 // Instanced Meshes für jeden Körperteil
-                const bodyPartMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8, vertexColors: false });
+                const bodyPartMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8 });
                 const shoesMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
-                const eyeAndMouthMaterial = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.5 });
+                const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+                const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x5c2121 });
 
                 const headMesh = new THREE.InstancedMesh(headGeo, bodyPartMaterial.clone(), totalPeople);
                 const torsoMesh = new THREE.InstancedMesh(torsoGeo, bodyPartMaterial.clone(), totalPeople);
@@ -1314,9 +1315,9 @@
                 const footLeftMesh = new THREE.InstancedMesh(footGeo, shoesMaterial, totalPeople);
                 const footRightMesh = new THREE.InstancedMesh(footGeo, shoesMaterial, totalPeople);
                 const hairMesh = new THREE.InstancedMesh(hairGeo, bodyPartMaterial.clone(), totalPeople);
-                const eyeLeftMesh = new THREE.InstancedMesh(eyeGeo, eyeAndMouthMaterial, totalPeople);
-                const eyeRightMesh = new THREE.InstancedMesh(eyeGeo, eyeAndMouthMaterial, totalPeople);
-                const mouthMesh = new THREE.InstancedMesh(mouthGeo, eyeAndMouthMaterial, totalPeople);
+                const eyeLeftMesh = new THREE.InstancedMesh(eyeGeo, eyeMaterial, totalPeople);
+                const eyeRightMesh = new THREE.InstancedMesh(eyeGeo, eyeMaterial, totalPeople);
+                const mouthMesh = new THREE.InstancedMesh(mouthGeo, mouthMaterial, totalPeople);
 
                 stationGroup.add(headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh);
 
@@ -1369,16 +1370,16 @@
 
                     setPartMatrix(headMesh, 0, 1.6, 0);
                     setPartMatrix(torsoMesh, 0, 1.15, 0);
-                    setPartMatrix(armLeftMesh, -0.28, 1.0, 0, 0, 0, Math.PI / 6);
-                    setPartMatrix(armRightMesh, 0.28, 1.0, 0, 0, 0, -Math.PI / 6);
+                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, 0, 0, 0.15);
+                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, 0, 0, -0.15);
                     setPartMatrix(legLeftMesh, -0.12, 0.45, 0);
                     setPartMatrix(legRightMesh, 0.12, 0.45, 0);
                     setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05);
                     setPartMatrix(footRightMesh, 0.12, 0.04, 0.05);
-                    setPartMatrix(hairMesh, 0, 1.68, 0);
-                    setPartMatrix(eyeLeftMesh, -0.06, 1.65, 0.16);
-                    setPartMatrix(eyeRightMesh, 0.06, 1.65, 0.16);
-                    setPartMatrix(mouthMesh, 0, 1.55, 0.16, Math.PI / 2, 0, 0);
+                    setPartMatrix(hairMesh, 0, 1.75, 0);
+                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15);
+                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15);
+                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, Math.PI / 2, Math.PI, 0);
                 }
 
                 // Wichtig: Updates für Matrizen und Farben anstoßen
