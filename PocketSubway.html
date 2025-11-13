@@ -1694,6 +1694,10 @@
                         color: s.color,
                         pointsAwarded: s.pointsAwarded,
                     })),
+
+                    // Pünktlichkeits-Zustand
+                    scheduleTime: scheduleTime,
+                    isScheduleTimerActive: scheduleTimer !== null,
                 };
 
                 const gameStateJSON = JSON.stringify(gameState);
@@ -1790,6 +1794,30 @@
                     const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
                     tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
                     tunnelMaterial.map.needsUpdate = true;
+
+                    // 6. Pünktlichkeits-Zustand wiederherstellen
+                    scheduleTime = gameState.scheduleTime || 0;
+                    if (scheduleTimer) clearInterval(scheduleTimer); // Alten Timer immer löschen
+                    scheduleTimer = null;
+
+                    if (gameState.isScheduleTimerActive) {
+                        ui.scheduleDisplay.classList.remove('hidden');
+                        ui.scheduleTime.classList.remove('text-red-500');
+                        ui.scheduleTime.classList.add('text-yellow-400');
+
+                        scheduleTimer = setInterval(() => {
+                            scheduleTime--;
+                            if (scheduleTime <= 0) {
+                                ui.scheduleTime.innerText = "VERSPÄTET";
+                                ui.scheduleTime.classList.add('text-red-500');
+                                ui.scheduleTime.classList.remove('text-yellow-400');
+                                clearInterval(scheduleTimer);
+                                scheduleTimer = null;
+                            }
+                        }, 1000);
+                    } else {
+                        ui.scheduleDisplay.classList.add('hidden');
+                    }
                 }
 
                 // --- Gemeinsame abschließende Schritte ---
