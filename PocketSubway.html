@@ -96,17 +96,10 @@
     <div id="ui-container" class="fixed inset-0 pointer-events-none p-4 md:p-8 flex flex-col justify-between hidden">
         
         <div class="w-full flex justify-between items-start text-base">
-            <div class="flex items-start space-x-2">
-                <div class="bg-black bg-opacity-25 p-2 rounded-lg shadow-lg">
-                    <h2 class="text-xs font-semibold text-gray-400">NÄCHSTE HALTESTELLE</h2>
-                    <p id="next-station-name" class="text-xl font-bold">Hauptbahnhof</p>
-                    <p id="next-station-distance" class="text-lg font-mono">1500 m</p>
-                </div>
-                <div id="schedule-container" class="bg-black bg-opacity-25 p-2 rounded-lg shadow-lg hidden">
-                    <h2 class="text-xs font-semibold text-yellow-400">FAHRPLAN</h2>
-                    <p id="schedule-time" class="text-xl font-bold font-mono text-yellow-400">02:30</p>
-                    <p id="schedule-status" class="text-lg">im Zeitplan</p>
-                </div>
+            <div class="bg-black bg-opacity-25 p-2 rounded-lg shadow-lg">
+                <h2 class="text-xs font-semibold text-gray-400">NÄCHSTE HALTESTELLE</h2>
+                <p id="next-station-name" class="text-xl font-bold">Hauptbahnhof</p>
+                <p id="next-station-distance" class="text-lg font-mono">1500 m</p>
             </div>
             
             <div class="flex items-start space-x-2">
@@ -488,15 +481,6 @@
         let boosterPurchased = false;
         let isPaused = false;
 
-        // Zeitmanagement
-        let timeAtLastStation = null;
-        let timeLimitForNextStation = 0;
-        let currentSchedule = {
-            active: false,
-            timeLeft: 0,
-            bonusAwarded: false
-        };
-
         const MASS = 50000; 
         const MAX_THROTTLE_FORCE = 80000; 
         const MAX_BRAKE_FORCE = 200000; 
@@ -525,9 +509,6 @@
             scoreDisplay: document.getElementById('score-display'),
             nextStationName: document.getElementById('next-station-name'),
             nextStationDistance: document.getElementById('next-station-distance'),
-            scheduleContainer: document.getElementById('schedule-container'),
-            scheduleTime: document.getElementById('schedule-time'),
-            scheduleStatus: document.getElementById('schedule-status'),
             throttleSlider: document.getElementById('throttle'),
             throttleValue: document.getElementById('throttle-value'),
             brakeSlider: document.getElementById('brake'),
@@ -2043,26 +2024,11 @@
             }
             
             if (atStation) {
-                // --- Logik bei Ankunft an einer Station ---
                 ui.nextStationName.innerText = currentStation.name;
                 ui.nextStationDistance.innerText = `STOP ${minDistanceToStop.toFixed(0)} m`;
                 
                 if (window.playerSpeed < 0.1) {
-                    // Zug steht
-                    if (currentSchedule.active) {
-                        currentSchedule.active = false; // Fahrplan für diese Strecke beenden
-                        ui.scheduleContainer.classList.add('hidden');
-                    }
-
                     if (currentStation && !currentStation.visited) {
-                        let pointsMessage = "+100 Punkte";
-                        // Pünktlichkeits-Bonus prüfen
-                        if (currentSchedule.timeLeft > 0 && !currentSchedule.bonusAwarded) {
-                            window.score += 50;
-                            pointsMessage += " (+50 Pünktlichkeit!)";
-                            currentSchedule.bonusAwarded = true; // Bonus nur einmal vergeben
-                        }
-
                         window.score += 100;
                         currentStation.visited = true;
                         showRandomFact();
@@ -2070,7 +2036,7 @@
                         const stationName = currentStation.name;
                         ui.statusMessage.dataset.station = stationName;
 
-                        ui.statusMessage.innerText = `Angehalten! ${pointsMessage}`;
+                        ui.statusMessage.innerText = `Angehalten! +100 Punkte`;
                         ui.statusMessage.classList.remove('hidden', 'bg-blue-600');
                         ui.statusMessage.classList.add('bg-green-500');
 
@@ -2082,55 +2048,40 @@
                         }, 5000);
 
                     } else if (!wasAtStation) {
+                        // Zeige eine temporäre "Ankunft"-Nachricht an, wenn keine andere wichtige Nachricht angezeigt wird
                         if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
-                             delete ui.statusMessage.dataset.station;
+                             delete ui.statusMessage.dataset.station; // Vorsichtshalber löschen
                              ui.statusMessage.innerText = `Haltestelle: ${currentStation.name}`;
                              ui.statusMessage.classList.remove('hidden', 'bg-green-500', 'bg-red-500');
                              ui.statusMessage.classList.add('bg-blue-600');
                         }
                     }
                 } else {
+                    // Verstecke die Nachricht nur, wenn keine wichtige, zeitgesteuerte Nachricht aktiv ist
                     if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
                         ui.statusMessage.classList.add('hidden');
                     }
                 }
 
             } else {
-                // --- Logik außerhalb einer Station ---
-                if (wasAtStation) {
-                    // --- Logik beim Verlassen einer Station ---
-                    if (previousStation && !previousStation.visited) {
-                        // Station verpasst
-                        window.score -= 100;
-                        const stationName = previousStation.name;
-                        ui.statusMessage.dataset.station = stationName;
-                        ui.statusMessage.innerText = `Station ${stationName} verpasst! -100 Punkte`;
-                        ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
-                        ui.statusMessage.classList.add('bg-red-500');
+                // Logik für das Verlassen einer Station
+                if (wasAtStation && previousStation && !previousStation.visited) {
+                    window.score -= 100;
 
-                        setTimeout(() => {
-                            if (ui.statusMessage.dataset.station === stationName) {
-                                ui.statusMessage.classList.add('hidden');
-                                delete ui.statusMessage.dataset.station;
-                            }
-                        }, 5000);
-                    } else if (previousStation && previousStation.visited) {
-                         // Station korrekt verlassen -> Fahrplan für nächste Station starten
-                        if (nextStation) {
-                            const AVERAGE_SPEED = 18; // m/s (~65 km/h)
-                            const STATION_BUFFER_TIME = 20; // 20s extra Zeit
-                            timeLimitForNextStation = (minDistanceToNext / AVERAGE_SPEED) + STATION_BUFFER_TIME;
+                    const stationName = previousStation.name;
+                    ui.statusMessage.dataset.station = stationName;
+                    ui.statusMessage.innerText = `Station ${stationName} verpasst! -100 Punkte`;
+                    ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
+                    ui.statusMessage.classList.add('bg-red-500');
 
-                            currentSchedule.active = true;
-                            currentSchedule.timeLeft = timeLimitForNextStation;
-                            currentSchedule.bonusAwarded = false;
-
-                            timeAtLastStation = clock.getElapsedTime();
-
-                            ui.scheduleContainer.classList.remove('hidden');
+                    setTimeout(() => {
+                        if (ui.statusMessage.dataset.station === stationName) {
+                            ui.statusMessage.classList.add('hidden');
+                            delete ui.statusMessage.dataset.station;
                         }
-                    }
+                    }, 5000);
                 } else {
+                    // Verstecke die Nachricht nur, wenn keine wichtige, zeitgesteuerte Nachricht aktiv ist
                     if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
                        ui.statusMessage.classList.add('hidden');
                     }
@@ -2212,27 +2163,6 @@
         function updateUI() {
             ui.speedDisplay.innerText = (window.playerSpeed * 3.6).toFixed(0);
             ui.scoreDisplay.innerText = score;
-
-            // Fahrplan-Anzeige aktualisieren
-            if (currentSchedule.active) {
-                const elapsedTime = clock.getElapsedTime() - timeAtLastStation;
-                currentSchedule.timeLeft = timeLimitForNextStation - elapsedTime;
-
-                if (currentSchedule.timeLeft < 0) {
-                    currentSchedule.timeLeft = 0;
-                    ui.scheduleStatus.innerText = "Verspätet";
-                    ui.scheduleStatus.classList.add('text-red-500');
-                    ui.scheduleTime.classList.add('text-red-500');
-                } else {
-                    ui.scheduleStatus.innerText = "im Zeitplan";
-                    ui.scheduleStatus.classList.remove('text-red-500');
-                    ui.scheduleTime.classList.remove('text-red-500');
-                }
-
-                const minutes = Math.floor(currentSchedule.timeLeft / 60);
-                const seconds = Math.floor(currentSchedule.timeLeft % 60);
-                ui.scheduleTime.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }
 
             if (score >= 100) {
                 ui.boosterButton.classList.remove('hidden');
