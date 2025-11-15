@@ -1898,147 +1898,161 @@
 
         function loadGame() {
             try {
-                // Das Spiel sofort fortsetzen, um das Menü auszublenden, BEVOR die Ladeoperation blockiert.
-                if (isPaused) {
-                    togglePause();
-                }
-
                 const gameStateJSON = localStorage.getItem('pocketSubwaySave');
                 if (!gameStateJSON) {
                     console.warn('Kein Spielstand gefunden.');
-                    // UI-Feedback...
                     return;
                 }
 
-                const gameState = JSON.parse(gameStateJSON);
+                // UI für Ladevorgang vorbereiten
+                if (isPaused) {
+                    ui.pauseMenu.classList.add('hidden');
+                    ui.pauseMenu.classList.remove('flex');
+                }
+                ui.loadingScreen.style.display = 'flex'; // Ladebildschirm anzeigen
 
-                // --- Kompatibilität für alte Speicherstände ---
-                if (!gameState.saveVersion || gameState.saveVersion < 2) {
-                    console.warn('Lade veralteten Spielstand. Nur Basis-Daten werden wiederhergestellt.');
-                    window.playerDistance = gameState.playerDistance || 0;
-                    window.score = gameState.score || 0;
-                    boosterPurchased = gameState.boosterPurchased || false;
-                    MAX_SPEED = gameState.maxSpeed || 33.3;
-                    window.playerSpeed = 0; // Alte Saves hatten keine Geschwindigkeit
-                    window.throttle = 0;
-                    window.brake = 0;
+                // Asynchroner Ladevorgang, um Einfrieren zu verhindern
+                setTimeout(() => {
+                    try {
+                        const gameState = JSON.parse(gameStateJSON);
 
-                    // Setze Upgrades auf Standard für alte Saves
-                    accelerationLevel = 1;
-                    brakingLevel = 1;
-                    maxSpeedLevel = 1;
-                    scoreMultiplierLevel = 1;
+                        // Kompatibilität prüfen (bleibt gleich)
+                        if (!gameState.saveVersion || gameState.saveVersion < 3) {
+                             console.warn('Lade veralteten Spielstand. Nur Basis-Daten werden wiederhergestellt.');
+                            window.playerDistance = gameState.playerDistance || 0;
+                            window.score = gameState.score || 0;
+                            window.playerSpeed = 0;
+                            window.throttle = 0;
+                            window.brake = 0;
+                            accelerationLevel = 1;
+                            brakingLevel = 1;
+                            maxSpeedLevel = 1;
+                            scoreMultiplierLevel = 1;
+                             // Alten Spielstand nicht weiter verarbeiten, da Strecke fehlt
+                            ui.loadingScreen.style.display = 'none';
+                            isPaused = false;
+                            clock.start();
+                            return;
+                        }
 
-                } else {
-                    // --- Laden des neuen, vollständigen Spielstands (v3+) ---
+                        // --- Laden des neuen, vollständigen Spielstands (v3+) ---
 
-                    // Upgrade-Level laden
-                    accelerationLevel = gameState.accelerationLevel || 1;
-                    brakingLevel = gameState.brakingLevel || 1;
-                    maxSpeedLevel = gameState.maxSpeedLevel || 1;
-                    scoreMultiplierLevel = gameState.scoreMultiplierLevel || 1;
+                        // Upgrade-Level laden
+                        accelerationLevel = gameState.accelerationLevel || 1;
+                        brakingLevel = gameState.brakingLevel || 1;
+                        maxSpeedLevel = gameState.maxSpeedLevel || 1;
+                        scoreMultiplierLevel = gameState.scoreMultiplierLevel || 1;
 
-                    // 1. Alle alten Streckenobjekte entfernen
-                    while(trackGroup.children.length > 0){
-                        const obj = trackGroup.children[0];
-                        trackGroup.remove(obj);
-                        // Wichtig: Geometrie und Material freigeben, um Speicherlecks zu vermeiden
-                        if(obj.geometry) obj.geometry.dispose();
-                        if(obj.material) {
-                            if (Array.isArray(obj.material)) {
-                                obj.material.forEach(m => m.dispose());
-                            } else {
-                                obj.material.dispose();
+                        // 1. Globale Strecken-Variablen explizit zurücksetzen
+                        trackCurve = null;
+                        totalTrackLength = 0;
+                        stations.length = 0;
+                        signals.length = 0;
+
+
+                        // 2. Alle alten Streckenobjekte sicher entfernen
+                        while(trackGroup.children.length > 0){
+                            const obj = trackGroup.children[0];
+                            trackGroup.remove(obj);
+                            if(obj.geometry) obj.geometry.dispose();
+                            if(obj.material) {
+                                if (Array.isArray(obj.material)) {
+                                    obj.material.forEach(m => m.dispose());
+                                } else {
+                                    obj.material.dispose();
+                                }
                             }
                         }
+
+
+                        // 3. Spielzustand wiederherstellen
+                        window.playerDistance = gameState.playerDistance;
+                        window.playerSpeed = gameState.playerSpeed;
+                        window.throttle = gameState.throttle;
+                        window.brake = gameState.brake;
+                        window.score = gameState.score;
+                        totalTrackLength = gameState.totalTrackLength;
+
+                        // 4. Globale Arrays mit gespeicherten Daten füllen
+                        gameState.stations.forEach(s => stations.push(s));
+                        gameState.signals.forEach(s => signals.push(s));
+
+                        // 5. Strecke aus den gespeicherten Punkten neu erstellen
+                        const loadedPoints = gameState.trackPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
+                        trackCurve = new THREE.CatmullRomCurve3(loadedPoints);
+                        trackCurve.curveType = 'catmullrom';
+                        trackCurve.tension = 0.5;
+
+                        // 6. Geometrie basierend auf der geladenen Kurve neu aufbauen
+                        createTrackGeometry(trackCurve);
+                        createStations(trackCurve);
+                        createSignals(trackCurve);
+                        const tunnelCircumference = 2 * Math.PI * 5.0;
+                        const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
+                        const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
+                        tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
+                        tunnelMaterial.map.needsUpdate = true;
+
+                        // 7. Pünktlichkeits-Zustand wiederherstellen
+                        scheduleTime = gameState.scheduleTime || 0;
+                        if (scheduleTimer) clearInterval(scheduleTimer);
+                        scheduleTimer = null;
+
+                        if (gameState.isScheduleTimerActive) {
+                            ui.scheduleDisplay.classList.remove('hidden');
+                            ui.scheduleTime.classList.remove('text-red-500');
+                            ui.scheduleTime.classList.add('text-yellow-400');
+                            scheduleTimer = setInterval(() => {
+                                scheduleTime--;
+                                if (scheduleTime <= 0) {
+                                    ui.scheduleTime.innerText = "VERSPÄTET";
+                                    ui.scheduleTime.classList.add('text-red-500');
+                                    ui.scheduleTime.classList.remove('text-yellow-400');
+                                    clearInterval(scheduleTimer);
+                                    scheduleTimer = null;
+                                }
+                            }, 1000);
+                        } else {
+                            ui.scheduleDisplay.classList.add('hidden');
+                        }
+
+
+                        // --- Gemeinsame abschließende Schritte ---
+                        doorsOpen = false;
+                        applyUpgrades();
+
+                        // UI-Elemente aktualisieren
+                        ui.throttleSlider.value = window.throttle * 100;
+                        ui.throttleValue.innerText = `${Math.round(window.throttle * 100)}%`;
+                        ui.brakeSlider.value = window.brake * 100;
+                        ui.brakeValue.innerText = `${Math.round(window.brake * 100)}%`;
+                        updateDoorButton();
+
+                        console.log('Spielstand geladen!');
+
+                        // Ladevorgang abgeschlossen
+                        ui.loadingScreen.style.display = 'none';
+                        isPaused = false; // Spiel fortsetzen
+                        clock.start();
+
+
+                    } catch (error) {
+                        console.error('Fehler im asynchronen Lade-Teil:', error);
+                        ui.loadingScreen.style.display = 'none';
+                        // Spiel im Zweifel fortsetzen, um nicht stecken zu bleiben
+                        isPaused = false;
+                        clock.start();
                     }
-                    // Auch die globalen Arrays zurücksetzen
-                    stations.length = 0;
-                    signals.length = 0;
 
-                    // 2. Spielzustand wiederherstellen
-                    window.playerDistance = gameState.playerDistance;
-                    window.playerSpeed = gameState.playerSpeed;
-                    window.throttle = gameState.throttle;
-                    window.brake = gameState.brake;
-                    window.score = gameState.score;
-                    boosterPurchased = gameState.boosterPurchased;
-                    MAX_SPEED = gameState.maxSpeed;
-                    totalTrackLength = gameState.totalTrackLength;
-
-                    // 3. Globale Arrays mit gespeicherten Daten füllen
-                    gameState.stations.forEach(s => stations.push(s));
-                    gameState.signals.forEach(s => signals.push(s));
-
-                    // 4. Strecke aus den gespeicherten Punkten neu erstellen
-                    const loadedPoints = gameState.trackPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
-                    trackCurve = new THREE.CatmullRomCurve3(loadedPoints);
-                    trackCurve.curveType = 'catmullrom';
-                    trackCurve.tension = 0.5;
-
-                    // 5. Geometrie basierend auf der geladenen Kurve neu aufbauen
-                    createTrackGeometry(trackCurve);
-                    createStations(trackCurve);
-                    createSignals(trackCurve);
-                     const tunnelCircumference = 2 * Math.PI * 5.0;
-                    const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
-                    const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
-                    tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
-                    tunnelMaterial.map.needsUpdate = true;
-
-                    // 6. Pünktlichkeits-Zustand wiederherstellen
-                    scheduleTime = gameState.scheduleTime || 0;
-                    if (scheduleTimer) clearInterval(scheduleTimer); // Alten Timer immer löschen
-                    scheduleTimer = null;
-
-                    if (gameState.isScheduleTimerActive) {
-                        ui.scheduleDisplay.classList.remove('hidden');
-                        ui.scheduleTime.classList.remove('text-red-500');
-                        ui.scheduleTime.classList.add('text-yellow-400');
-
-                        scheduleTimer = setInterval(() => {
-                            scheduleTime--;
-                            if (scheduleTime <= 0) {
-                                ui.scheduleTime.innerText = "VERSPÄTET";
-                                ui.scheduleTime.classList.add('text-red-500');
-                                ui.scheduleTime.classList.remove('text-yellow-400');
-                                clearInterval(scheduleTimer);
-                                scheduleTimer = null;
-                            }
-                        }, 1000);
-                    } else {
-                        ui.scheduleDisplay.classList.add('hidden');
-                    }
-                }
-
-                // --- Gemeinsame abschließende Schritte ---
-                doorsOpen = false;
-                applyUpgrades();
-
-                // UI-Elemente aktualisieren
-                ui.throttleSlider.value = window.throttle * 100;
-                ui.throttleValue.innerText = `${Math.round(window.throttle * 100)}%`;
-                ui.brakeSlider.value = window.brake * 100;
-                ui.brakeValue.innerText = `${Math.round(window.brake * 100)}%`;
-                updateDoorButton();
-
-                console.log('Spielstand geladen!');
-                const originalText = ui.loadButton.innerText;
-                ui.loadButton.innerText = 'Geladen!';
-                ui.loadButton.disabled = true;
-                // Timeout entfernt, um Tests zu stabilisieren
-                ui.loadButton.innerText = originalText;
-                ui.loadButton.disabled = false;
-                // Das Fortsetzen des Spiels erfolgt jetzt am ANFANG der Funktion.
-
+                }, 50); // 50ms Timeout, damit der Browser den Ladebildschirm rendern kann
 
             } catch (error) {
-                console.error('Fehler beim Laden des Spiels:', error);
-                 const originalText = ui.loadButton.innerText;
-                ui.loadButton.innerText = 'Fehler!';
-                 setTimeout(() => {
-                    ui.loadButton.innerText = originalText;
-                }, 2000);
+                console.error('Fehler beim Initialisieren des Ladevorgangs:', error);
+                ui.loadingScreen.style.display = 'none'; // Ladebildschirm im Fehlerfall ausblenden
+                 if (isPaused) { // Wenn pausiert, wieder fortsetzen, um nicht stecken zu bleiben
+                    isPaused = false;
+                    clock.start();
+                }
             }
         }
 
