@@ -529,36 +529,47 @@
         }
 
         // --- Globale Variablen ---
-        let scene, camera, renderer, clock, stats, trackGroup;
-        let driverCab; 
-        let trackCurve; 
-        let totalTrackLength = 0;
-        window.playerDistance = 0;
-        window.playerSpeed = 0;
+        // THREE.js Core-Komponenten
+        let scene; // Die Hauptszene, die alle 3D-Objekte enthält.
+        let camera; // Die virtuelle Kamera, durch die der Spieler die Welt sieht.
+        let renderer; // Der WebGL-Renderer, der die Szene auf den Bildschirm zeichnet.
+        let clock; // Eine Uhr zur Messung der Zeit zwischen den Frames (Delta Time).
+        let stats; // Ein (derzeit deaktiviertes) Panel zur Anzeige von Performance-Daten wie FPS.
+        let trackGroup; // Eine THREE.Group, die alle visuellen Elemente der Strecke (Tunnel, Gleise, etc.) zusammenfasst.
 
-        // Sound Variablen
-        let engineSound, brakeSound;
-        let audioStarted = false; 
+        // Spielwelt-Objekte
+        let driverCab; // Das 3D-Modell des Cockpits, das an die Kamera angehängt ist.
+        let trackCurve; // Eine THREE.CatmullRomCurve3, die den exakten Verlauf der Strecke definiert.
+        let totalTrackLength = 0; // Die Gesamtlänge der Strecke in Metern.
+
+        // Spieler-Zustand (an `window` gebunden für leichten Zugriff und Speicherung)
+        window.playerDistance = 0; // Die vom Spieler zurückgelegte Distanz auf der Strecke in Metern.
+        window.playerSpeed = 0; // Die aktuelle Geschwindigkeit des Zuges in Metern pro Sekunde.
+
+        // Sound-Variablen
+        let engineSound; // Das Tone.js-Objekt für das Motorgeräusch.
+        let brakeSound; // Das Tone.js-Objekt für das Bremsgeräusch.
+        let audioStarted = false; // Ein Flag, das anzeigt, ob der AudioContext durch eine Benutzerinteraktion gestartet wurde.
 
         // Steuerungs- und Physikvariablen
-        window.throttle = 0;
-        window.brake = 0;
-        let doorsOpen = false;
-        let atStation = false;
-        let currentStation = null;
-        let previousStation = null;
-        window.credits = 0;
-        let passengers = 0;
-        let scheduleTime = 0;
-        let scheduleTimer = null;
-        let isPaused = false;
+        window.throttle = 0; // Aktueller Schub des Spielers (0.0 bis 1.0). An `window` für einfachen Zugriff gebunden.
+        window.brake = 0; // Aktuelle Bremskraft des Spielers (0.0 bis 1.0). An `window` für einfachen Zugriff gebunden.
+        let doorsOpen = false; // Zustand der Zugtüren (geöffnet/geschlossen).
+        let atStation = false; // Flag, das anzeigt, ob sich der Zug gerade innerhalb der Grenzen einer Station befindet.
+        let currentStation = null; // Das Objekt der aktuellen Station, wenn `atStation` true ist.
+        let previousStation = null; // Speichert die zuletzt besuchte Station, um Logik beim Verlassen auszulösen.
+        window.credits = 0; // Die Spielwährung des Spielers. An `window` für einfachen Zugriff und Speicherung gebunden.
+        let passengers = 0; // Die aktuelle Anzahl der Passagiere im Zug.
+        let scheduleTime = 0; // Die verbleibende Zeit in Sekunden, um die nächste Station pünktlich zu erreichen.
+        let scheduleTimer = null; // Die `setInterval`-ID für den Fahrplan-Countdown.
+        let isPaused = false; // Zustand des Pausenmenüs.
 
         // --- Upgrade-System Variablen ---
-        let accelerationLevel = 1;
-        let brakingLevel = 1;
-        let maxSpeedLevel = 1;
-        let scoreMultiplierLevel = 1;
-        let scoreMultiplier = 1.0;
+        let accelerationLevel = 1; // Das aktuelle Level für die Beschleunigung.
+        let brakingLevel = 1; // Das aktuelle Level für die Bremskraft.
+        let maxSpeedLevel = 1; // Das aktuelle Level für die Höchstgeschwindigkeit.
+        let scoreMultiplierLevel = 1; // Das aktuelle Level für den Einnahme-Multiplikator.
+        let scoreMultiplier = 1.0; // Der aus `scoreMultiplierLevel` berechnete Multiplikator.
 
         const BASE_MAX_THROTTLE_FORCE = 80000;
         const BASE_MAX_BRAKE_FORCE = 200000;
