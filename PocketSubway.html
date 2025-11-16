@@ -105,7 +105,7 @@
                     </div>
                     <div class="text-right">
                         <p class="text-lg font-mono">Level <span id="acceleration-level">1</span></p>
-                        <button id="buy-acceleration" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Kaufen: 150 P</button>
+                        <button id="buy-acceleration" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Kaufen: 150 C</button>
                     </div>
                 </div>
                  <!-- Upgrade Item -->
@@ -116,7 +116,7 @@
                     </div>
                     <div class="text-right">
                         <p class="text-lg font-mono">Level <span id="braking-level">1</span></p>
-                        <button id="buy-braking" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Kaufen: 150 P</button>
+                        <button id="buy-braking" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Kaufen: 150 C</button>
                     </div>
                 </div>
                 <!-- Upgrade Item -->
@@ -127,18 +127,18 @@
                     </div>
                      <div class="text-right">
                         <p class="text-lg font-mono">Level <span id="max-speed-level">1</span></p>
-                        <button id="buy-max-speed" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="250">Kaufen: 250 P</button>
+                        <button id="buy-max-speed" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="250">Kaufen: 250 C</button>
                     </div>
                 </div>
                  <!-- Upgrade Item -->
                 <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
                     <div>
-                        <h3 class="text-xl font-bold">Punkte-Multiplikator</h3>
-                        <p class="text-sm text-gray-400">Erhöht alle erhaltenen Punkte.</p>
+                        <h3 class="text-xl font-bold">Einnahme-Multiplikator</h3>
+                        <p class="text-sm text-gray-400">Erhöht alle erhaltenen Einnahmen.</p>
                     </div>
                     <div class="text-right">
                         <p class="text-lg font-mono">Level <span id="score-multiplier-level">1</span></p>
-                        <button id="buy-score-multiplier" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="500">Kaufen: 500 P</button>
+                        <button id="buy-score-multiplier" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="500">Kaufen: 500 C</button>
                     </div>
                 </div>
             </div>
@@ -166,15 +166,15 @@
                     <div class="bg-black bg-opacity-40 p-2 rounded-lg shadow-lg text-right pointer-events-auto">
                          <div class="flex justify-between items-baseline space-x-4">
                             <div>
-                                <h2 class="text-xs font-semibold text-gray-400">PUNKTE</h2>
-                                <p id="score-display" class="text-xl font-bold font-mono">0</p>
+                                <h2 class="text-xs font-semibold text-gray-400">CREDITS</h2>
+                                <p id="credits-display" class="text-xl font-bold font-mono">0</p>
                             </div>
-                            <!--
+
                              <div>
                                 <h2 class="text-xs font-semibold text-gray-400">PASSAGIERE</h2>
                                 <p id="passenger-display" class="text-xl font-bold font-mono">0</p>
                             </div>
-                             -->
+
                         </div>
                     </div>
                     <div class="bg-black bg-opacity-40 p-2 rounded-lg shadow-lg text-right">
@@ -547,8 +547,8 @@
         let atStation = false;
         let currentStation = null;
         let previousStation = null;
-        window.score = 0;
-        //let passengers = 0;
+        window.credits = 0;
+        let passengers = 0;
         let scheduleTime = 0;
         let scheduleTimer = null;
         let isPaused = false;
@@ -575,7 +575,6 @@
         // Strecken-Generierung
         const stations = [];
         const signals = [];
-        window.signals = signals; // Exposed for verification
         const NUM_SEGMENTS = 50;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
@@ -590,7 +589,7 @@
             loadingScreen: document.getElementById('loading-screen'),
             uiContainer: document.getElementById('ui-container'),
             speedDisplay: document.getElementById('speed-display'),
-            scoreDisplay: document.getElementById('score-display'),
+            creditsDisplay: document.getElementById('credits-display'),
             nextStationName: document.getElementById('next-station-name'),
             nextStationDistance: document.getElementById('next-station-distance'),
             throttleSlider: document.getElementById('throttle'),
@@ -608,7 +607,7 @@
             saveButton: document.getElementById('save-button'),
             loadButton: document.getElementById('load-button'),
             factDisplay: document.getElementById('fact-display'),
-            //passengerDisplay: document.getElementById('passenger-display'),
+            passengerDisplay: document.getElementById('passenger-display'),
             scheduleDisplay: document.getElementById('schedule-display'),
             scheduleTime: document.getElementById('schedule-time'),
 
@@ -936,7 +935,8 @@
                 name: generateFunnyStationName(),
                 distance: totalTrackLength + segmentLength / 2, 
                 length: segmentLength,
-                visited: false
+                visited: false,
+                passengersExchanged: false
             });
 
             for (let m = 0; m < segmentLength; m++) {
@@ -978,7 +978,8 @@
                         name: generateFunnyStationName(),
                         distance: totalTrackLength + segmentLength / 2,
                         length: segmentLength,
-                        visited: false
+                        visited: false,
+                        passengersExchanged: false
                     });
                     lastWasStation = true;
                 } else {
@@ -1697,6 +1698,9 @@
                 if (atStation && window.playerSpeed < 0.1) {
                     doorsOpen = !doorsOpen;
                     updateDoorButton();
+                    if (doorsOpen) {
+                        handlePassengerExchange();
+                    }
                 }
             });
 
@@ -1719,7 +1723,7 @@
             // Cheat code: 10 schnelle Klicks auf den Punktestand für +1000 Punkte
             let scoreClickCount = 0;
             let lastScoreClickTime = 0;
-            ui.scoreDisplay.parentElement.addEventListener('click', () => { // Listener auf dem Elternelement für eine größere Klickfläche
+            ui.creditsDisplay.parentElement.addEventListener('click', () => { // Listener auf dem Elternelement für eine größere Klickfläche
                 const now = Date.now();
                 if (now - lastScoreClickTime > 400) { // Zeitfenster von 400ms
                     scoreClickCount = 0;
@@ -1728,11 +1732,11 @@
                 scoreClickCount++;
 
                 if (scoreClickCount >= 10) {
-                    window.score += 1000;
+                    window.credits += 1000;
                     scoreClickCount = 0;
 
                     // Visuelles Feedback
-                    const scoreContainer = ui.scoreDisplay.parentElement;
+                    const scoreContainer = ui.creditsDisplay.parentElement;
                     scoreContainer.style.transition = 'transform 0.1s ease-in-out';
                     scoreContainer.style.transform = 'scale(1.2)';
                     setTimeout(() => {
@@ -1767,6 +1771,24 @@
             ui.buyScoreMultiplierButton.addEventListener('click', () => buyUpgrade('scoreMultiplier'));
         }
 
+        function handlePassengerExchange() {
+            if (!currentStation || currentStation.passengersExchanged) return;
+
+            const arrivingPassengers = Math.floor(Math.random() * (passengers + 1));
+            const departingPassengers = Math.floor(Math.random() * 10) + 5;
+            const income = Math.round(arrivingPassengers * 10 * scoreMultiplier);
+            passengers -= arrivingPassengers;
+            passengers += departingPassengers;
+
+            let message = `\n${arrivingPassengers} Passagiere ausgestiegen. +${income} Credits!`;
+
+            window.credits += income;
+            currentStation.passengersExchanged = true; // Mark exchange as complete
+
+            // Update status message specifically for passenger exchange
+            ui.statusMessage.innerText += message; // Append to existing message
+        }
+
         // --- Upgrade-System Logik ---
         function applyUpgrades() {
             MAX_THROTTLE_FORCE = BASE_MAX_THROTTLE_FORCE * (1 + (accelerationLevel - 1) * 0.15); // +15% pro Level
@@ -1789,16 +1811,16 @@
             ui.buyMaxSpeedButton.dataset.cost = calcCost(250, maxSpeedLevel);
             ui.buyScoreMultiplierButton.dataset.cost = calcCost(500, scoreMultiplierLevel);
 
-            ui.buyAccelerationButton.innerText = `Kaufen: ${ui.buyAccelerationButton.dataset.cost} P`;
-            ui.buyBrakingButton.innerText = `Kaufen: ${ui.buyBrakingButton.dataset.cost} P`;
-            ui.buyMaxSpeedButton.innerText = `Kaufen: ${ui.buyMaxSpeedButton.dataset.cost} P`;
-            ui.buyScoreMultiplierButton.innerText = `Kaufen: ${ui.buyScoreMultiplierButton.dataset.cost} P`;
+            ui.buyAccelerationButton.innerText = `Kaufen: ${ui.buyAccelerationButton.dataset.cost} C`;
+            ui.buyBrakingButton.innerText = `Kaufen: ${ui.buyBrakingButton.dataset.cost} C`;
+            ui.buyMaxSpeedButton.innerText = `Kaufen: ${ui.buyMaxSpeedButton.dataset.cost} C`;
+            ui.buyScoreMultiplierButton.innerText = `Kaufen: ${ui.buyScoreMultiplierButton.dataset.cost} C`;
 
-            // Buttons deaktivieren, wenn nicht genug Punkte
-            ui.buyAccelerationButton.disabled = window.score < ui.buyAccelerationButton.dataset.cost;
-            ui.buyBrakingButton.disabled = window.score < ui.buyBrakingButton.dataset.cost;
-            ui.buyMaxSpeedButton.disabled = window.score < ui.buyMaxSpeedButton.dataset.cost;
-            ui.buyScoreMultiplierButton.disabled = window.score < ui.buyScoreMultiplierButton.dataset.cost;
+            // Buttons deaktivieren, wenn nicht genug Credits
+            ui.buyAccelerationButton.disabled = window.credits < ui.buyAccelerationButton.dataset.cost;
+            ui.buyBrakingButton.disabled = window.credits < ui.buyBrakingButton.dataset.cost;
+            ui.buyMaxSpeedButton.disabled = window.credits < ui.buyMaxSpeedButton.dataset.cost;
+            ui.buyScoreMultiplierButton.disabled = window.credits < ui.buyScoreMultiplierButton.dataset.cost;
         }
 
 
@@ -1807,29 +1829,29 @@
             switch (type) {
                 case 'acceleration':
                     cost = parseInt(ui.buyAccelerationButton.dataset.cost);
-                    if (window.score >= cost) {
-                        window.score -= cost;
+                    if (window.credits >= cost) {
+                        window.credits -= cost;
                         accelerationLevel++;
                     }
                     break;
                 case 'braking':
                      cost = parseInt(ui.buyBrakingButton.dataset.cost);
-                    if (window.score >= cost) {
-                        window.score -= cost;
+                    if (window.credits >= cost) {
+                        window.credits -= cost;
                         brakingLevel++;
                     }
                     break;
                 case 'maxSpeed':
                      cost = parseInt(ui.buyMaxSpeedButton.dataset.cost);
-                    if (window.score >= cost) {
-                        window.score -= cost;
+                    if (window.credits >= cost) {
+                        window.credits -= cost;
                         maxSpeedLevel++;
                     }
                     break;
                 case 'scoreMultiplier':
                      cost = parseInt(ui.buyScoreMultiplierButton.dataset.cost);
-                    if (window.score >= cost) {
-                        window.score -= cost;
+                    if (window.credits >= cost) {
+                        window.credits -= cost;
                         scoreMultiplierLevel++;
                     }
                     break;
@@ -1849,7 +1871,8 @@
                     playerSpeed: window.playerSpeed,
                     throttle: window.throttle,
                     brake: window.brake,
-                    score: window.score,
+                    credits: window.credits,
+                    passengers: passengers,
 
                     // Upgrade Levels
                     accelerationLevel: accelerationLevel,
@@ -1920,7 +1943,7 @@
                         if (!gameState.saveVersion || gameState.saveVersion < 3) {
                              console.warn('Lade veralteten Spielstand. Nur Basis-Daten werden wiederhergestellt.');
                             window.playerDistance = gameState.playerDistance || 0;
-                            window.score = gameState.score || 0;
+                            window.credits = gameState.score || 0; // Legacy support
                             window.playerSpeed = 0;
                             window.throttle = 0;
                             window.brake = 0;
@@ -1970,7 +1993,8 @@
                         window.playerSpeed = gameState.playerSpeed;
                         window.throttle = gameState.throttle;
                         window.brake = gameState.brake;
-                        window.score = gameState.score;
+                        window.credits = gameState.credits || gameState.score || 0; // Legacy support
+                        passengers = gameState.passengers || 0;
                         totalTrackLength = gameState.totalTrackLength;
 
                         // 4. Globale Arrays mit gespeicherten Daten füllen
@@ -2286,9 +2310,8 @@
                 
                 if (window.playerSpeed < 0.1) {
                     if (currentStation && !currentStation.visited) {
-                        let pointsForStop = Math.round(100 * scoreMultiplier);
                         let bonus = 0;
-                        let message = `Angehalten! +${pointsForStop} Punkte`;
+                        let message = `Angehalten in ${currentStation.name}. Öffne die Türen zum Ein- und Aussteigen.`;
                         if (scheduleTimer) {
                             clearInterval(scheduleTimer);
                             scheduleTimer = null;
@@ -2296,18 +2319,12 @@
 
                             if (scheduleTime > 0) {
                                 bonus = Math.round(50 * scoreMultiplier);
-                                window.score += bonus;
+                                window.credits += bonus;
                                 message += `\nPünktlich! +${bonus} Bonus!`;
                             }
                             scheduleTime = 0;
                         }
 
-                        //const arrivingPassengers = Math.floor(Math.random() * (passengers + 1));
-                        //const departingPassengers = Math.floor(Math.random() * 10) + 5;
-                        //passengers -= arrivingPassengers;
-                        //passengers += departingPassengers;
-
-                        window.score += pointsForStop;
                         currentStation.visited = true;
                         showRandomFact();
 
@@ -2318,12 +2335,14 @@
                         ui.statusMessage.classList.remove('hidden', 'bg-blue-600');
                         ui.statusMessage.classList.add('bg-green-500');
 
+                        // Nachricht nach 10 Sekunden ausblenden
                         setTimeout(() => {
+                            // Nur ausblenden, wenn sich die Nachricht in der Zwischenzeit nicht geändert hat
                             if (ui.statusMessage.dataset.station === stationName) {
                                 ui.statusMessage.classList.add('hidden');
                                 delete ui.statusMessage.dataset.station;
                             }
-                        }, 5000);
+                        }, 10000);
 
                     } else if (!wasAtStation) {
                         // Zeige eine temporäre "Ankunft"-Nachricht an, wenn keine andere wichtige Nachricht angezeigt wird
@@ -2346,10 +2365,10 @@
                 if (wasAtStation && previousStation) {
                     if (!previousStation.visited) {
                         const penalty = 100; // Penalty is not multiplied
-                        window.score -= penalty;
+                        window.credits -= penalty;
                         const stationName = previousStation.name;
                         ui.statusMessage.dataset.station = stationName;
-                        ui.statusMessage.innerText = `Station ${stationName} verpasst! -${penalty} Punkte`;
+                        ui.statusMessage.innerText = `Station ${stationName} verpasst! -${penalty} Credits`;
                         ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
                         ui.statusMessage.classList.add('bg-red-500');
 
@@ -2416,13 +2435,13 @@
                     // Fall 1: Spieler hält korrekt vor dem roten Signal an (mit kleiner Toleranz für Überschießen)
                     if (distToSignal > -5 && distToSignal < 30) {
                         if (window.playerSpeed < 0.1) {
-                            const points = Math.round(100 * scoreMultiplier);
-                            window.score += points;
+                            const credits = Math.round(100 * scoreMultiplier);
+                            window.credits += credits;
                             signal.pointsAwarded = true; // Verhindert doppelte Punkte/Strafen
 
                             const signalId = `signal-${signal.distance}`;
                             ui.statusMessage.dataset.signal = signalId;
-                            ui.statusMessage.innerText = `An rotem Signal gehalten! +${points} Punkte`;
+                            ui.statusMessage.innerText = `An rotem Signal gehalten! +${credits} Credits`;
                             ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-red-500');
                             ui.statusMessage.classList.add('bg-green-500');
 
@@ -2444,12 +2463,12 @@
                     // Signale, die durch die "wrap-around"-Distanzberechnung fälschlicherweise als "gerade passiert" interpretiert werden.
                     else if (distToSignal < -5 && distToSignal > -50 && window.playerSpeed > 0.5) {
                         const penalty = 100; // Penalty is not multiplied
-                        window.score -= penalty;
+                        window.credits -= penalty;
                         signal.pointsAwarded = true; // Verhindert weitere Strafen für dieses Signal
 
                         const signalId = `signal-${signal.distance}`;
                         ui.statusMessage.dataset.signal = signalId;
-                        ui.statusMessage.innerText = `Rotes Signal überfahren! -${penalty} Punkte`;
+                        ui.statusMessage.innerText = `Rotes Signal überfahren! -${penalty} Credits`;
                         ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
                         ui.statusMessage.classList.add('bg-red-500');
 
@@ -2467,8 +2486,8 @@
         // --- UI-Updates ---
         function updateUI() {
             ui.speedDisplay.innerText = (window.playerSpeed * 3.6).toFixed(0);
-            ui.scoreDisplay.innerText = score;
-            //ui.passengerDisplay.innerText = passengers;
+            ui.creditsDisplay.innerText = window.credits;
+            ui.passengerDisplay.innerText = passengers;
 
             if (scheduleTimer) {
                 const minutes = Math.floor(scheduleTime / 60);
