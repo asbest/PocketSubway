@@ -792,29 +792,74 @@
                 volume: -Infinity,
             }).connect(autoFilter).start();
 
-            // Door Open Sound (Zischen)
-            doorOpenSound = new Tone.NoiseSynth({
+            // --- Komplexer 3-Sekunden Tür-Öffnen-Sound ---
+            const doorOpenHiss = new Tone.NoiseSynth({
                 noise: { type: 'white' },
-                envelope: {
-                    attack: 0.005,
-                    decay: 0.2,
-                    sustain: 0,
-                    release: 0.15
-                },
-                volume: -18
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.1 },
+            }).toDestination();
+            doorOpenHiss.volume.value = -15;
+
+            const doorOpenFilter = new Tone.Filter(800, "bandpass").toDestination();
+            const doorOpenNoise = new Tone.Noise('brown').connect(doorOpenFilter);
+            doorOpenNoise.volume.value = -25;
+
+            // Definiere eine Funktion, die den Sound abspielt
+            const startDoorOpenSound = () => {
+                const now = Tone.now();
+                // 1. Kurzes Zischen am Anfang
+                doorOpenHiss.triggerAttackRelease(0.1, now);
+
+                // 2. Schiebgeräusch
+                doorOpenNoise.start(now + 0.1);
+                doorOpenFilter.frequency.rampTo(1500, 2.8, now + 0.1);
+
+                // 3. Nach 3 Sekunden stoppen
+                doorOpenNoise.stop(now + 2.9);
+            };
+
+            // Weise die Start-Funktion der globalen Variable zu
+            doorOpenSound = { start: startDoorOpenSound };
+
+            // --- Komplexer 3-Sekunden Tür-Schließen-Sound ---
+            const doorCloseFilter = new Tone.Filter(1500, "bandpass").toDestination();
+            const doorCloseNoise = new Tone.Noise('brown').connect(doorCloseFilter);
+            doorCloseNoise.volume.value = -25;
+
+            const doorThud = new Tone.MembraneSynth({
+                pitchDecay: 0.08,
+                octaves: 2,
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.01, release: 0.1 },
+                volume: -5
             }).toDestination();
 
-            // Door Close Sound (dumpfer)
-            doorCloseSound = new Tone.NoiseSynth({
-                noise: { type: 'pink' },
-                envelope: {
-                    attack: 0.01,
-                    decay: 0.25,
-                    sustain: 0,
-                    release: 0.2
-                },
-                volume: -12
+            const doorLockClick = new Tone.MetalSynth({
+                frequency: 400,
+                envelope: { attack: 0.001, decay: 0.05, release: 0.05 },
+                harmonicity: 8.5,
+                modulationIndex: 40,
+                resonance: 3000,
+                octaves: 1.5,
+                volume: -10
             }).toDestination();
+
+            const startDoorCloseSound = () => {
+                const now = Tone.now();
+                // 1. Schiebgeräusch
+                doorCloseNoise.start(now);
+                doorCloseFilter.frequency.rampTo(800, 2.8, now);
+
+                // 2. Dumpfer Aufprall am Ende
+                doorThud.triggerAttack("C1", now + 2.8);
+
+                // 3. Klick des Schlosses
+                doorLockClick.triggerAttack(now + 2.9);
+
+                // 4. Stoppen des Schiebgeräuschs
+                doorCloseNoise.stop(now + 3.0);
+            };
+
+            doorCloseSound = { start: startDoorCloseSound };
 
             Tone.Transport.start();
         }
@@ -1754,12 +1799,12 @@
                         handlePassengerExchange();
                         if (audioStarted) {
                             stationAmbienceSound?.volume.rampTo(-25, 0.5);
-                            doorOpenSound?.triggerAttack();
+                            doorOpenSound?.start();
                         }
                     } else {
                         if (audioStarted) {
                             stationAmbienceSound?.volume.rampTo(-Infinity, 0.5);
-                            doorCloseSound?.triggerAttack();
+                            doorCloseSound?.start();
                         }
                     }
                 }
