@@ -549,6 +549,7 @@
         // Sound-Variablen
         let engineSound; // Das Tone.js-Objekt für das Motorgeräusch.
         let brakeSound; // Das Tone.js-Objekt für das Bremsgeräusch.
+        let wasBrakingLastFrame = false; // Zustand für die Bremsgeräusch-Logik
         let stationAmbienceSound; // Sound für die Bahnhofs-Atmosphäre
         let doorOpenSound, doorCloseSound; // Sounds für die Türen
         let drivingSound, drivingFilter; // Sanftes Fahrgeräusch
@@ -2219,7 +2220,7 @@
                     if (engineSound && engineSound.state === "started") {
                         engineSound.volume.rampTo(-Infinity, 0.1);
                     }
-                    if (brakeSound && brakeSound.volume.value > -Infinity) {
+                    if (brakeSound && brakeSound.state !== "stopped") {
                         brakeSound.triggerRelease(Tone.now());
                     }
                 }
@@ -2310,6 +2311,7 @@
                 // Tatsächliche Beschleunigung berechnen
                 const actualAcceleration = (window.playerSpeed - oldSpeed) / dt;
 
+                // --- Motorgeräusch ---
                 if (window.throttle > 0 && window.playerSpeed > 0.1) {
                     // Beschleunigen oder Geschwindigkeit halten
                     if (engineSound.state !== "started") {
@@ -2327,25 +2329,8 @@
 
                     engineSound.volume.rampTo(targetVolume, 0.1);
 
-                    if (brakeSound.volume.value > -Infinity) {
-                        brakeSound.triggerRelease(now);
-                    }
-
-                } else if (window.brake > 0 && window.playerSpeed > 0.1) {
-                    // Bremsen
-                    if (brakeSound.volume.value === -Infinity) {
-                         brakeSound.triggerAttack(now);
-                    }
-                    const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, window.brake * speedRatio);
-                    brakeSound.volume.rampTo(targetBrakeVol, 0.05);
-
-                    if (engineSound.state === "started") {
-                         engineSound.volume.rampTo(-Infinity, 0.5, now);
-                         setTimeout(() => { if (window.brake > 0) engineSound.stop() }, 500);
-                         lastAccelerationFactor = 0;
-                    }
                 } else {
-                    // Leerlauf oder Stillstand
+                     // Leerlauf oder Stillstand
                      if (engineSound.state === "started") {
                          const idleVolume = (window.playerSpeed > 0.1) ? -40 : -Infinity;
                          engineSound.volume.rampTo(idleVolume, 0.5, now);
@@ -2355,10 +2340,31 @@
                          }
                          lastAccelerationFactor = 0;
                      }
-                    if (brakeSound.volume.value > -Infinity) {
-                        brakeSound.triggerRelease(now);
-                    }
                 }
+
+                // --- Bremsgeräusch (Zustandsbasierte Logik) ---
+                const isBrakingThisFrame = window.brake > 0 && window.playerSpeed > 0.1;
+
+                if (isBrakingThisFrame && !wasBrakingLastFrame) {
+                    // Bremse wurde gerade aktiviert
+                    if (engineSound.state === "started") {
+                         engineSound.volume.rampTo(-Infinity, 0.5, now);
+                         setTimeout(() => { if (window.brake > 0) engineSound.stop() }, 500);
+                         lastAccelerationFactor = 0;
+                    }
+                    brakeSound.triggerAttack(now);
+                } else if (!isBrakingThisFrame && wasBrakingLastFrame) {
+                    // Bremse wurde gerade gelöst
+                    brakeSound.triggerRelease(now);
+                }
+
+                // Lautstärke anpassen, während gebremst wird
+                if (isBrakingThisFrame) {
+                    const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, window.brake * speedRatio);
+                    brakeSound.volume.rampTo(targetBrakeVol, 0.05);
+                }
+                wasBrakingLastFrame = isBrakingThisFrame;
+
 
                 // --- Fahrgeräusch Steuerung ---
                 if (drivingSound && window.playerSpeed > 0.1) {
