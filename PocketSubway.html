@@ -549,6 +549,7 @@
         // Sound-Variablen
         let engineSound; // Das Tone.js-Objekt für das Motorgeräusch.
         let brakeSound; // Das Tone.js-Objekt für das Bremsgeräusch.
+        let stationAmbienceSound; // Sound für die Bahnhofs-Atmosphäre
         let audioStarted = false; // Ein Flag, das anzeigt, ob der AudioContext durch eine Benutzerinteraktion gestartet wurde.
 
         // Steuerungs- und Physikvariablen
@@ -777,6 +778,20 @@
                 },
                 volume: -Infinity 
             }).toDestination();
+
+            // Station Ambience (murmur)
+            const autoFilter = new Tone.AutoFilter({
+                frequency: "4n",
+                baseFrequency: 400,
+                octaves: 2
+            }).toDestination();
+
+            stationAmbienceSound = new Tone.Noise({
+                type: "brown",
+                volume: -Infinity,
+            }).connect(autoFilter).start();
+
+            Tone.Transport.start();
         }
 
         // --- Prozedurale Materialerzeugung ---
@@ -1712,6 +1727,13 @@
                     updateDoorButton();
                     if (doorsOpen) {
                         handlePassengerExchange();
+                        if (audioStarted && stationAmbienceSound) {
+                            stationAmbienceSound.volume.rampTo(-25, 0.5); // Sanft einblenden
+                        }
+                    } else {
+                        if (audioStarted && stationAmbienceSound) {
+                            stationAmbienceSound.volume.rampTo(-Infinity, 0.5); // Sanft ausblenden
+                        }
                     }
                 }
             });
