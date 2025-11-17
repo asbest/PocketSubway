@@ -558,6 +558,7 @@
         let atStation = false; // Flag, das anzeigt, ob sich der Zug gerade innerhalb der Grenzen einer Station befindet.
         let currentStation = null; // Das Objekt der aktuellen Station, wenn `atStation` true ist.
         let previousStation = null; // Speichert die zuletzt besuchte Station, um Logik beim Verlassen auszulösen.
+        let letzteAngesagteStation = null; // Für die Bahnhofsansagen
         window.credits = 0; // Die Spielwährung des Spielers. An `window` für einfachen Zugriff und Speicherung gebunden.
         let passengers = 0; // Die aktuelle Anzahl der Passagiere im Zug.
         let scheduleTime = 0; // Die verbleibende Zeit in Sekunden, um die nächste Station pünktlich zu erreichen.
@@ -2423,6 +2424,11 @@
                 if (nextStation) {
                     ui.nextStationName.innerText = nextStation.name;
                     ui.nextStationDistance.innerText = `${minDistanceToNext.toFixed(0)} m`;
+
+                    if (letzteAngesagteStation !== nextStation.name) {
+                        ansageNaechsteStation(nextStation.name);
+                        letzteAngesagteStation = nextStation.name;
+                    }
                 }
             }
 
@@ -2505,6 +2511,21 @@
                 const seconds = scheduleTime % 60;
                 ui.scheduleTime.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
+        }
+
+        function ansageNaechsteStation(stationsname) {
+            if (!window.speechSynthesis || !audioStarted) return;
+
+            // Verhindert, dass Ansagen sich gegenseitig unterbrechen, falls eine vorherige noch läuft
+            if (window.speechSynthesis.speaking) {
+                return;
+            }
+
+            const ansage = new SpeechSynthesisUtterance(`Nächste Station: ${stationsname}`);
+            ansage.lang = 'de-DE';
+            ansage.rate = 0.9;
+            ansage.pitch = 1.1;
+            window.speechSynthesis.speak(ansage);
         }
         
         function updateDoorButton() {
