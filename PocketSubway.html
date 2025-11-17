@@ -551,6 +551,7 @@
         let brakeSound; // Das Tone.js-Objekt für das Bremsgeräusch.
         let stationAmbienceSound; // Sound für die Bahnhofs-Atmosphäre
         let doorOpenSound, doorCloseSound; // Sounds für die Türen
+        let railSound, railClickSynth; // Sound für die Gleise
         let audioStarted = false; // Ein Flag, das anzeigt, ob der AudioContext durch eine Benutzerinteraktion gestartet wurde.
 
         // Steuerungs- und Physikvariablen
@@ -860,6 +861,25 @@
             };
 
             doorCloseSound = { start: startDoorCloseSound };
+
+            // --- Gleis-Sound (Klick-Klack) ---
+            railClickSynth = new Tone.MetalSynth({
+                frequency: 800,
+                envelope: { attack: 0.001, decay: 0.1, release: 0.1 },
+                harmonicity: 3.1,
+                modulationIndex: 12,
+                resonance: 2500,
+                octaves: 1.5,
+                volume: -Infinity // Startet stumm
+            }).toDestination();
+
+            railSound = new Tone.Sequence((time, note) => {
+                // Wechsle die Frequenz für zwei unterschiedliche Klänge
+                railClickSynth.frequency.value = note === 'C5' ? 800 : 600;
+                railClickSynth.triggerAttack(time);
+            }, ['C5', null, 'G4', null], '8n').start(0);
+            railSound.loop = true;
+
 
             Tone.Transport.start();
         }
@@ -2200,6 +2220,7 @@
                 // No need to update upgrade UI here, only when opening it.
 
                 if (audioStarted) {
+                    if (Tone.Transport.state !== 'paused') Tone.Transport.pause();
                     // Stoppe Sounds, die aktiv sein könnten
                     if (engineSound && engineSound.state === "started") {
                         engineSound.volume.rampTo(-Infinity, 0.1);
@@ -2210,6 +2231,9 @@
                 }
             } else {
                 clock.start();
+                if (audioStarted) {
+                    if (Tone.Transport.state !== 'started') Tone.Transport.start();
+                }
                 ui.pauseMenu.classList.add('hidden');
                 ui.pauseMenu.classList.remove('flex');
             }
@@ -2340,6 +2364,20 @@
                     if (brakeSound.volume.value > -Infinity) {
                         brakeSound.triggerRelease(now);
                     }
+                }
+
+                // --- Gleis-Sound Steuerung ---
+                if (railClickSynth && window.playerSpeed > 1) {
+                    // BPM proportional zur Geschwindigkeit
+                    const targetBPM = 80 + speedRatio * 220; // von 80 bis 300 BPM
+                    Tone.Transport.bpm.rampTo(targetBPM, 0.1);
+
+                    // Lautstärke proportional zur Geschwindigkeit, aber subtil
+                    const targetRailVol = THREE.MathUtils.lerp(-45, -35, speedRatio);
+                    railClickSynth.volume.rampTo(targetRailVol, 0.1);
+                } else if (railClickSynth) {
+                    // Bei geringer Geschwindigkeit ausblenden
+                    railClickSynth.volume.rampTo(-Infinity, 0.5);
                 }
             }
         }
