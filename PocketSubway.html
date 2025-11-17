@@ -2327,13 +2327,13 @@
 
                     engineSound.volume.rampTo(targetVolume, 0.1);
 
-                    if (brakeSound.volume.value > -Infinity) {
+                    if (brakeSound.state !== "stopped") {
                         brakeSound.triggerRelease(now);
                     }
 
                 } else if (window.brake > 0 && window.playerSpeed > 0.1) {
                     // Bremsen
-                    if (brakeSound.volume.value === -Infinity) {
+                    if (brakeSound.state === "stopped") {
                          brakeSound.triggerAttack(now);
                     }
                     const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, window.brake * speedRatio);
@@ -2355,7 +2355,7 @@
                          }
                          lastAccelerationFactor = 0;
                      }
-                    if (brakeSound.volume.value > -Infinity) {
+                    if (brakeSound.state !== "stopped") {
                         brakeSound.triggerRelease(now);
                     }
                 }
