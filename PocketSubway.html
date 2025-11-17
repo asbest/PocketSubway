@@ -550,6 +550,7 @@
         let engineSound; // Das Tone.js-Objekt für das Motorgeräusch.
         let brakeSound; // Das Tone.js-Objekt für das Bremsgeräusch.
         let stationAmbienceSound; // Sound für die Bahnhofs-Atmosphäre
+        let doorOpenSound, doorCloseSound; // Sounds für die Türen
         let audioStarted = false; // Ein Flag, das anzeigt, ob der AudioContext durch eine Benutzerinteraktion gestartet wurde.
 
         // Steuerungs- und Physikvariablen
@@ -790,6 +791,30 @@
                 type: "brown",
                 volume: -Infinity,
             }).connect(autoFilter).start();
+
+            // Door Open Sound (Zischen)
+            doorOpenSound = new Tone.NoiseSynth({
+                noise: { type: 'white' },
+                envelope: {
+                    attack: 0.005,
+                    decay: 0.2,
+                    sustain: 0,
+                    release: 0.15
+                },
+                volume: -18
+            }).toDestination();
+
+            // Door Close Sound (dumpfer)
+            doorCloseSound = new Tone.NoiseSynth({
+                noise: { type: 'pink' },
+                envelope: {
+                    attack: 0.01,
+                    decay: 0.25,
+                    sustain: 0,
+                    release: 0.2
+                },
+                volume: -12
+            }).toDestination();
 
             Tone.Transport.start();
         }
@@ -1727,12 +1752,14 @@
                     updateDoorButton();
                     if (doorsOpen) {
                         handlePassengerExchange();
-                        if (audioStarted && stationAmbienceSound) {
-                            stationAmbienceSound.volume.rampTo(-25, 0.5); // Sanft einblenden
+                        if (audioStarted) {
+                            stationAmbienceSound?.volume.rampTo(-25, 0.5);
+                            doorOpenSound?.triggerAttack();
                         }
                     } else {
-                        if (audioStarted && stationAmbienceSound) {
-                            stationAmbienceSound.volume.rampTo(-Infinity, 0.5); // Sanft ausblenden
+                        if (audioStarted) {
+                            stationAmbienceSound?.volume.rampTo(-Infinity, 0.5);
+                            doorCloseSound?.triggerAttack();
                         }
                     }
                 }
