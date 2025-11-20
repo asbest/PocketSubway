@@ -92,6 +92,27 @@
                 <button id="restart-button" class="bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
                     Neustart
                 </button>
+
+                <!-- Einstellungen -->
+                <div class="flex space-x-8 mt-8 justify-center">
+                    <!-- Headlight Switch -->
+                    <div class="flex flex-col items-center bg-gray-800 bg-opacity-80 p-4 rounded-lg text-white">
+                        <span class="text-lg font-bold mb-2">Scheinwerfer</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="headlight-toggle" class="sr-only peer" checked>
+                            <div class="w-14 h-7 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+
+                    <!-- Sound Switch -->
+                    <div class="flex flex-col items-center bg-gray-800 bg-opacity-80 p-4 rounded-lg text-white">
+                        <span class="text-lg font-bold mb-2">Sound</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="sound-toggle" class="sr-only peer" checked>
+                            <div class="w-14 h-7 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -617,6 +638,7 @@
         let dustParticles; // Partikelsystem für Staub
 
         // Spielwelt-Objekte
+        let headlight; // Der Scheinwerfer des Zuges
         let driverCab; // Das 3D-Modell des Cockpits, das an die Kamera angehängt ist.
         let trackCurve; // Eine THREE.CatmullRomCurve3, die den exakten Verlauf der Strecke definiert.
         let totalTrackLength = 0; // Die Gesamtlänge der Strecke in Metern.
@@ -778,7 +800,7 @@
             //camera.add(cabinLight); // Licht reist mit der Kamera (Kabine)
 
             // --- Scheinwerfer (Headlight) mit Schatten ---
-            const headlight = new THREE.SpotLight(0xffffee, 2.0, 2000, Math.PI / 5, 0.3, 1); 
+            headlight = new THREE.SpotLight(0xffffee, 2.0, 2000, Math.PI / 5, 0.3, 1);
 			headlight.position.set(0, 2.0, -1.0);
 			headlight.target.position.set(0, 1.0, -50);
 			headlight.castShadow = true;
@@ -2048,6 +2070,15 @@
             ui.buyBrakingButton.addEventListener('click', () => buyUpgrade('braking'));
             ui.buyMaxSpeedButton.addEventListener('click', () => buyUpgrade('maxSpeed'));
             ui.buyScoreMultiplierButton.addEventListener('click', () => buyUpgrade('scoreMultiplier'));
+
+            // Settings Toggles
+            document.getElementById('headlight-toggle').addEventListener('change', (e) => {
+                if (headlight) headlight.visible = e.target.checked;
+            });
+
+            document.getElementById('sound-toggle').addEventListener('change', (e) => {
+                Tone.Destination.mute = !e.target.checked;
+            });
         }
 
         function handlePassengerExchange() {
