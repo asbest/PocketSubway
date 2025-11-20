@@ -10,7 +10,8 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://cdn.skypack.dev/three@0.138.0"
+                "three": "https://unpkg.com/three@0.138.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.138.0/examples/jsm/"
             }
         }
     </script>
@@ -234,6 +235,9 @@
 
     <script type="module">
         import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
         // --- Perlin Noise für prozedurale Texturen ---
         // Implementierung von SimplexNoise (ähnlich Perlin, aber etwas besser)
@@ -325,6 +329,9 @@
             const c1 = new THREE.Color(color1);
             const c2 = new THREE.Color(color2);
 
+            const heightMap = new Float32Array(width * height);
+
+            // 1. Generiere Heightmap
             for (let x = 0; x < width; x++) {
                 for (let y = 0; y < height; y++) {
                     let total = 0;
@@ -339,18 +346,58 @@
                         frequency *= lacunarity;
                     }
 
-                    const value = (total / maxValue + 1) / 2; // Normalize to 0-1
-                    const interpolatedColor = new THREE.Color().lerpColors(c1, c2, value);
+                    const value = (total / maxValue + 1) / 2;
+                    heightMap[y * width + x] = value;
 
+                    const interpolatedColor = new THREE.Color().lerpColors(c1, c2, value);
                     const i = (y * width + x) * 4;
                     data[i] = Math.floor(interpolatedColor.r * 255);
                     data[i + 1] = Math.floor(interpolatedColor.g * 255);
                     data[i + 2] = Math.floor(interpolatedColor.b * 255);
-                    data[i + 3] = 255; // Alpha
+                    data[i + 3] = 255;
                 }
             }
             ctx.putImageData(imageData, 0, 0);
-            return new THREE.CanvasTexture(canvas);
+            const texture = new THREE.CanvasTexture(canvas);
+
+            // 2. Generiere Normal Map aus Heightmap
+            const normalCanvas = document.createElement('canvas');
+            normalCanvas.width = width;
+            normalCanvas.height = height;
+            const normalCtx = normalCanvas.getContext('2d');
+            const normalImageData = normalCtx.createImageData(width, height);
+            const normalData = normalImageData.data;
+
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    // Sobel Filter zur Normalen-Berechnung
+                    const xLeft = (x - 1 + width) % width;
+                    const xRight = (x + 1) % width;
+                    const yUp = (y - 1 + height) % height;
+                    const yDown = (y + 1) % height;
+
+                    const hL = heightMap[y * width + xLeft];
+                    const hR = heightMap[y * width + xRight];
+                    const hU = heightMap[yUp * width + x];
+                    const hD = heightMap[yDown * width + x];
+
+                    const dx = (hR - hL) * 2.0; // Stärke skalierbar
+                    const dy = (hD - hU) * 2.0;
+                    const dz = 1.0 / 5.0; // "Flachheit"
+
+                    const vec = new THREE.Vector3(-dx, -dy, dz).normalize();
+
+                    const i = (y * width + x) * 4;
+                    normalData[i] = Math.floor((vec.x * 0.5 + 0.5) * 255);
+                    normalData[i + 1] = Math.floor((vec.y * 0.5 + 0.5) * 255);
+                    normalData[i + 2] = Math.floor((vec.z * 0.5 + 0.5) * 255);
+                    normalData[i + 3] = 255;
+                }
+            }
+            normalCtx.putImageData(normalImageData, 0, 0);
+            const normalTexture = new THREE.CanvasTexture(normalCanvas);
+
+            return { texture, normalTexture };
         }
 
         function generateBrickTexture(width, height) {
@@ -359,38 +406,68 @@
             canvas.height = height;
             const ctx = canvas.getContext('2d');
 
+            const normalCanvas = document.createElement('canvas');
+            normalCanvas.width = width;
+            normalCanvas.height = height;
+            const normalCtx = normalCanvas.getContext('2d');
+
             const brickWidth = 60;
             const brickHeight = 20;
             const mortarThickness = 4;
-            const brickColor = '#8B4513'; // SaddleBrown
-            const mortarColor = '#808080'; // Gray
+            const brickColor = '#8B4513';
+            const mortarColor = '#555555'; // Etwas dunkler für Diffuse
 
-            // Hintergrund (Fugen)
+            // --- Diffuse Map ---
             ctx.fillStyle = mortarColor;
             ctx.fillRect(0, 0, width, height);
 
-            ctx.fillStyle = brickColor;
+            // --- Normal Map Hintergrund (flach, blau) ---
+            normalCtx.fillStyle = 'rgb(128, 128, 255)';
+            normalCtx.fillRect(0, 0, width, height);
 
             for (let y = 0; y < height; y += brickHeight + mortarThickness) {
                 for (let x = 0; x < width; x += brickWidth + mortarThickness) {
                     let offsetX = 0;
-                    // Jede zweite Reihe versetzen
                     if ((y / (brickHeight + mortarThickness)) % 2 === 1) {
                         offsetX = -(brickWidth + mortarThickness) / 2;
                     }
 
-                    // Zeichne Ziegelstein
+                    // Zeichne Color
+                    ctx.fillStyle = brickColor;
                     ctx.fillRect(x + offsetX, y, brickWidth, brickHeight);
-                    // Um das Muster nahtlos zu machen, zeichne auch den Teil, der links/rechts herausragt
-                     if (offsetX !== 0) {
-                        ctx.fillRect(x + offsetX + width, y, brickWidth, brickHeight);
-                    }
+                    if (offsetX !== 0) ctx.fillRect(x + offsetX + width, y, brickWidth, brickHeight);
 
+                    // Zeichne Normals (Simulierter "Bevel" Effekt)
+                    // Innenbereich flach (nach vorne, z=1 -> blau)
+                    normalCtx.fillStyle = 'rgb(128, 128, 255)';
+                    normalCtx.fillRect(x + offsetX + 2, y + 2, brickWidth - 4, brickHeight - 4);
+                    if (offsetX !== 0) normalCtx.fillRect(x + offsetX + width + 2, y + 2, brickWidth - 4, brickHeight - 4);
+
+                    // Kanten simulieren (einfach) - könnte man aufwändiger machen, aber das reicht für den Effekt
+                    // Oben/Links (Licht kommt von oben links -> heller)
+                    // Unten/Rechts (Licht abgewandt -> dunkler)
+                    // Für Normal Maps: Schräge Flächen kodieren.
                 }
             }
+
+            // Rauschen über Ziegel legen für Normal Map Details
+            const imageData = normalCtx.getImageData(0,0, width, height);
+            const data = imageData.data;
+            for(let i=0; i<data.length; i+=4) {
+                 if (data[i+2] > 200) { // Nur auf den Ziegeln (blau)
+                     const noise = (Math.random() - 0.5) * 20;
+                     data[i] = Math.min(255, Math.max(0, data[i] + noise));
+                     data[i+1] = Math.min(255, Math.max(0, data[i+1] + noise));
+                 }
+            }
+            normalCtx.putImageData(imageData, 0, 0);
+
             const texture = new THREE.CanvasTexture(canvas);
             texture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
-            return texture;
+
+            const normalTexture = new THREE.CanvasTexture(normalCanvas);
+
+            return { texture, normalTexture };
         }
 
         function generateFunnyStationName() {
@@ -533,9 +610,11 @@
         let scene; // Die Hauptszene, die alle 3D-Objekte enthält.
         let camera; // Die virtuelle Kamera, durch die der Spieler die Welt sieht.
         let renderer; // Der WebGL-Renderer, der die Szene auf den Bildschirm zeichnet.
+        let composer; // EffectComposer für Post-Processing (Bloom etc.)
         let clock; // Eine Uhr zur Messung der Zeit zwischen den Frames (Delta Time).
         let stats; // Ein (derzeit deaktiviertes) Panel zur Anzeige von Performance-Daten wie FPS.
         let trackGroup; // Eine THREE.Group, die alle visuellen Elemente der Strecke (Tunnel, Gleise, etc.) zusammenfasst.
+        let dustParticles; // Partikelsystem für Staub
 
         // Spielwelt-Objekte
         let driverCab; // Das 3D-Modell des Cockpits, das an die Kamera angehängt ist.
@@ -672,18 +751,47 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
-            renderer.shadowMap.enabled = false; 
+            renderer.shadowMap.enabled = true; // Schatten aktivieren
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Weiche Schatten
             container.appendChild(renderer.domElement);
 
+            // --- Post-Processing Setup (Bloom) ---
+            const renderScene = new RenderPass(scene, camera);
+
+            // Auflösung, Stärke, Radius, Threshold
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = 0.2; // Ab welcher Helligkeit Bloom wirkt
+            bloomPass.strength = 0.8;  // Wie stark das Leuchten ist
+            bloomPass.radius = 0.5;    // Wie weit das Leuchten streut
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
             // --- Beleuchtung für MeshStandardMaterial ---
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); 
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.1); // Ambient stark reduziert für mehr Kontrast
             scene.add(ambientLight);
             
-            const pointLight = new THREE.PointLight(0xffffff, 0.5, 50, 2);
-            pointLight.position.set(0, 3, -10);
-            scene.add(pointLight);
+            // PointLight entfernt/angepasst - wird durch Headlight ersetzt oder als Kabinenlicht genutzt
+            const cabinLight = new THREE.PointLight(0xffaa00, 0.2, 5, 1);
+            cabinLight.position.set(0, 1.5, 0);
+            camera.add(cabinLight); // Licht reist mit der Kamera (Kabine)
+
+            // --- Scheinwerfer (Headlight) mit Schatten ---
+            const headlight = new THREE.SpotLight(0xffffee, 2.0, 150, Math.PI / 5, 0.3, 1);
+            headlight.position.set(0, 2.0, -1.0); // Etwas höher
+            headlight.target.position.set(0, 1.0, -50);
+            headlight.castShadow = true;
+            headlight.shadow.mapSize.width = 2048; // High quality shadows
+            headlight.shadow.mapSize.height = 2048;
+            headlight.shadow.bias = -0.00005; // Reduce shadow acne
+            headlight.shadow.camera.near = 0.5;
+            headlight.shadow.camera.far = 150;
+            camera.add(headlight);
+            camera.add(headlight.target);
             
-            const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8); 
+            // HemisphereLight reduziert
+            const hemisphereLight = new THREE.HemisphereLight(0x202020, 0x101010, 0.4);
             scene.add(hemisphereLight);
             
             // Cockpit erstellen
@@ -693,6 +801,9 @@
 
             // Prozedurale Materialien generieren
             createProceduralMaterials();
+
+            // Staub-Partikel
+            createDust();
 
             // Standard-Upgrade-Werte anwenden
             applyUpgrades();
@@ -882,15 +993,21 @@
         // --- Prozedurale Materialerzeugung ---
         function createProceduralMaterials() {
              // Tunnel Material
-            const brickTexture = generateBrickTexture(256, 256);
+            const { texture: brickTexture, normalTexture: brickNormal } = generateBrickTexture(256, 256);
             brickTexture.wrapS = THREE.RepeatWrapping;
             brickTexture.wrapT = THREE.RepeatWrapping;
+            brickNormal.wrapS = THREE.RepeatWrapping;
+            brickNormal.wrapT = THREE.RepeatWrapping;
+
             // Die Wiederholung in Y-Richtung (Umfang) wird auf 40 gesetzt für eine realistischere Ziegelhöhe.
             // Die X-Wiederholung (Länge) wird nach der Streckengenerierung basierend auf der echten Länge berechnet.
             brickTexture.repeat.set(1, 40);
+            brickNormal.repeat.set(1, 40);
 
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
                 map: brickTexture,
+                normalMap: brickNormal,
+                normalScale: new THREE.Vector2(1, 1),
                 side: THREE.BackSide, 
                 roughness: 0.9,
                 metalness: 0.05
@@ -917,7 +1034,7 @@
             });
 
             // Bahnhof Materialien
-            const stationWallTexture = generateNoiseTexture(512, 128, {
+            const { texture: stationWallTexture, normalTexture: stationWallNormal } = generateNoiseTexture(512, 128, {
                 scale: 12,
                 octaves: 2,
                 persistence: 0.5,
@@ -927,13 +1044,17 @@
             });
             stationWallTexture.wrapS = THREE.RepeatWrapping;
             stationWallTexture.wrapT = THREE.RepeatWrapping;
+            stationWallNormal.wrapS = THREE.RepeatWrapping;
+            stationWallNormal.wrapT = THREE.RepeatWrapping;
+
             stationWallMaterial = new THREE.MeshStandardMaterial({ 
                 map: stationWallTexture,
+                normalMap: stationWallNormal,
                 roughness: 0.7,
                 metalness: 0.1
             });
             
-            const stationFloorTexture = generateNoiseTexture(256, 256, {
+            const { texture: stationFloorTexture, normalTexture: stationFloorNormal } = generateNoiseTexture(256, 256, {
                 scale: 50,
                 octaves: 3,
                 persistence: 0.4,
@@ -943,8 +1064,12 @@
             });
             stationFloorTexture.wrapS = THREE.RepeatWrapping;
             stationFloorTexture.wrapT = THREE.RepeatWrapping;
+            stationFloorNormal.wrapS = THREE.RepeatWrapping;
+            stationFloorNormal.wrapT = THREE.RepeatWrapping;
+
             stationFloorMaterial = new THREE.MeshStandardMaterial({ 
                 map: stationFloorTexture,
+                normalMap: stationFloorNormal,
                 roughness: 0.6,
                 metalness: 0.05
             });
@@ -977,7 +1102,7 @@
             });
 
             // Gleisbett (Beton) Material
-            const trackbedTexture = generateNoiseTexture(256, 256, {
+            const { texture: trackbedTexture, normalTexture: trackbedNormal } = generateNoiseTexture(256, 256, {
                 scale: 80,
                 octaves: 2,
                 persistence: 0.3,
@@ -987,8 +1112,12 @@
             });
             trackbedTexture.wrapS = THREE.RepeatWrapping;
             trackbedTexture.wrapT = THREE.RepeatWrapping;
+            trackbedNormal.wrapS = THREE.RepeatWrapping;
+            trackbedNormal.wrapT = THREE.RepeatWrapping;
+
             trackbedMaterial = new THREE.MeshStandardMaterial({
                 map: trackbedTexture,
+                normalMap: trackbedNormal,
                 roughness: 0.85,
                 metalness: 0.0
             });
@@ -1169,7 +1298,9 @@
             const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
             const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Assume square bricks for now
             tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
+            tunnelMaterial.normalMap.repeat.x = totalTrackLength / physicalWidthOfOneRepeat; // Auch NormalMap anpassen!
             tunnelMaterial.map.needsUpdate = true;
+            tunnelMaterial.normalMap.needsUpdate = true;
         }
 
         // --- Strecken-Geometrie ---
@@ -1216,6 +1347,7 @@
             const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
             const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 32, false);
             const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
+            tunnelMesh.receiveShadow = true; // Schatten empfangen
             trackGroup.add(tunnelMesh);
 
             // Tunnelbögen hinzufügen
@@ -1240,6 +1372,7 @@
             const tieGeo = new THREE.BoxGeometry(2.5, 0.15, 0.3);
             const tieCount = Math.floor(totalTrackLength / 1.5);
             const tieMesh = new THREE.InstancedMesh(tieGeo, tieMaterial, tieCount);
+            tieMesh.receiveShadow = true; // Schatten empfangen
 
             const dummy = new THREE.Object3D();
             const lookAtPos = new THREE.Vector3();
@@ -1265,6 +1398,7 @@
             // 5. Gleisbett
             const trackbedGeo = new THREE.BoxGeometry(3.0, 0.2, 1.5);
             const trackbedMesh = new THREE.InstancedMesh(trackbedGeo, trackbedMaterial, tieCount); // Gleiche Anzahl wie Schwellen
+            trackbedMesh.receiveShadow = true; // Schatten empfangen
 
             for (let i = 0; i < tieCount; i++) {
                 const t = (i / tieCount);
@@ -1295,6 +1429,8 @@
 
             const archCount = Math.floor(totalTrackLength / archSpacing);
             const archMesh = new THREE.InstancedMesh(archGeo, archMat, archCount);
+            archMesh.castShadow = true; // Schatten werfen
+            archMesh.receiveShadow = true;
 
             const dummy = new THREE.Object3D();
             const pos = new THREE.Vector3();
@@ -1352,6 +1488,10 @@
             const cableMesh1 = new THREE.InstancedMesh(cableGeo1, cableMaterial, cableCount);
             const cableMesh2 = new THREE.InstancedMesh(cableGeo2, cableMaterial, cableCount);
             const cableMesh3 = new THREE.InstancedMesh(cableGeo2, cableMaterial, cableCount);
+
+            cableMesh1.castShadow = true;
+            cableMesh2.castShadow = true;
+            cableMesh3.castShadow = true;
 
             const dummy = new THREE.Object3D();
             const pos = new THREE.Vector3();
@@ -1432,10 +1572,14 @@
                 const platformGeo = new THREE.BoxGeometry(platformWidth, 0.5, station.length); 
                 const platformMeshLeft = new THREE.Mesh(platformGeo, stationFloorMaterial);
                 platformMeshLeft.position.set(platformOffset, platformHeight - 0.25, 0); 
+                platformMeshLeft.receiveShadow = true;
+                platformMeshLeft.castShadow = true;
                 stationGroup.add(platformMeshLeft);
 
                 const platformMeshRight = new THREE.Mesh(platformGeo, stationFloorMaterial);
                 platformMeshRight.position.set(-platformOffset, platformHeight - 0.25, 0); 
+                platformMeshRight.receiveShadow = true;
+                platformMeshRight.castShadow = true;
                 stationGroup.add(platformMeshRight);
 
                 // 2. Wände (außen zur Tunnelwand)
@@ -1443,10 +1587,14 @@
                 const wallGeo = new THREE.BoxGeometry(wallThickness, stationWallHeight, station.length); 
                 const wallMeshLeft = new THREE.Mesh(wallGeo, stationWallMaterial);
                 wallMeshLeft.position.set(platformOffset + platformWidth / 2 + wallThickness / 2, platformHeight + (stationWallHeight / 2) - 0.5, 0); 
+                wallMeshLeft.receiveShadow = true;
+                wallMeshLeft.castShadow = true;
                 stationGroup.add(wallMeshLeft);
 
                 const wallMeshRight = new THREE.Mesh(wallGeo, stationWallMaterial);
                 wallMeshRight.position.set(-(platformOffset + platformWidth / 2 + wallThickness / 2), platformHeight + (stationWallHeight / 2) - 0.5, 0); 
+                wallMeshRight.receiveShadow = true;
+                wallMeshRight.castShadow = true;
                 stationGroup.add(wallMeshRight);
 
                 // 3. Decke - ENTFERNT
@@ -1535,6 +1683,12 @@
                 const eyeLeftMesh = new THREE.InstancedMesh(eyeGeo, eyeMaterial, totalPeople);
                 const eyeRightMesh = new THREE.InstancedMesh(eyeGeo, eyeMaterial, totalPeople);
                 const mouthMesh = new THREE.InstancedMesh(mouthGeo, mouthMaterial, totalPeople);
+
+                // Schatten für Personen
+                [headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh].forEach(mesh => {
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                });
 
                 stationGroup.add(headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh);
 
@@ -1636,6 +1790,10 @@
             greenLightBoxMesh = new THREE.InstancedMesh(lightBoxGeo, signalBoxGreenMaterial, signals.length);
             redLightMesh = new THREE.InstancedMesh(lightGeo, signalLightRedMaterial, signals.length);
             greenLightMesh = new THREE.InstancedMesh(lightGeo, signalLightGreenMaterial, signals.length);
+
+            signalMastMesh.castShadow = true;
+            redLightBoxMesh.castShadow = true;
+            greenLightBoxMesh.castShadow = true;
 
             const dummy = new THREE.Object3D();
             const pos = new THREE.Vector3();
@@ -2241,7 +2399,8 @@
             
             if (isPaused) {
                 // Im pausierten Zustand nichts tun, außer Rendern, um das Menü anzuzeigen
-                renderer.render(scene, camera);
+                // renderer.render(scene, camera);
+                if (composer) composer.render();
                 return;
             }
 
@@ -2249,11 +2408,13 @@
 
             updatePhysics(dt);
             updateCameraPosition();
+            updateDust();
             checkSignalStatus();
             checkStationStatus();
             updateUI();
 
-            renderer.render(scene, camera);
+            // renderer.render(scene, camera);
+            if (composer) composer.render();
             
             // stats.end(); // Entfernt
         }
@@ -2410,10 +2571,76 @@
             const lookDownOffset = -0.3; 
              _camLookAtTarget.addScaledVector(_camNormal, lookDownOffset); 
 
+            // Camera Shake
+            const speedShake = Math.max(0, window.playerSpeed) * 0.002;
+            const shakeX = (Math.random() - 0.5) * speedShake;
+            const shakeY = (Math.random() - 0.5) * speedShake;
+            const shakeZ = (Math.random() - 0.5) * speedShake;
+            camera.position.add(new THREE.Vector3(shakeX, shakeY, shakeZ));
+
             // Dynamischen Up-Vektor verwenden
             camera.up.copy(_camNormal); 
 
             camera.lookAt(_camLookAtTarget); 
+        }
+
+        function createDust() {
+            const particleCount = 1500;
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            // Initial distribution around (0,0,0)
+            for (let i = 0; i < particleCount; i++) {
+                positions.push((Math.random() - 0.5) * 60);
+                positions.push((Math.random() - 0.5) * 30);
+                positions.push((Math.random() - 0.5) * 60);
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+            // Weiche Partikel-Textur
+            const canvas = document.createElement('canvas');
+            canvas.width = 32; canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16,16,0,16,16,16);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,32,32);
+            const dustTexture = new THREE.CanvasTexture(canvas);
+
+            const material = new THREE.PointsMaterial({
+                color: 0xaaaaaa,
+                size: 0.05,
+                transparent: true,
+                opacity: 0.4,
+                map: dustTexture,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            dustParticles = new THREE.Points(geometry, material);
+            scene.add(dustParticles);
+        }
+
+        function updateDust() {
+            if (!dustParticles || !camera) return;
+            const positions = dustParticles.geometry.attributes.position.array;
+            const camPos = camera.position;
+            const range = 40;
+
+            for (let i = 0; i < positions.length; i += 3) {
+                // Wrap X
+                if (positions[i] < camPos.x - range) positions[i] += range * 2;
+                else if (positions[i] > camPos.x + range) positions[i] -= range * 2;
+
+                // Wrap Y
+                if (positions[i+1] < camPos.y - range) positions[i+1] += range * 2;
+                else if (positions[i+1] > camPos.y + range) positions[i+1] -= range * 2;
+
+                // Wrap Z
+                if (positions[i+2] < camPos.z - range) positions[i+2] += range * 2;
+                else if (positions[i+2] > camPos.z + range) positions[i+2] -= range * 2;
+            }
+            dustParticles.geometry.attributes.position.needsUpdate = true;
         }
 
         // --- Stations-Logik ---
@@ -2687,6 +2914,7 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
+            if (composer) composer.setSize(window.innerWidth, window.innerHeight);
         }
 
         // --- Start ---
