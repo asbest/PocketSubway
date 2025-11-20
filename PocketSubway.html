@@ -637,6 +637,7 @@
         let dustParticles; // Partikelsystem für Staub
 
         // Spielwelt-Objekte
+        let ambientLight; // Globales Umgebungslicht
         let headlight; // Der Scheinwerfer des Zuges
         let driverCab; // Das 3D-Modell des Cockpits, das an die Kamera angehängt ist.
         let trackCurve; // Eine THREE.CatmullRomCurve3, die den exakten Verlauf der Strecke definiert.
@@ -755,7 +756,7 @@
             // Szene
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x202020);
-            scene.fog = new THREE.Fog(0x202020, 50, 400); 
+            scene.fog = new THREE.Fog(0x202020, 50, 800);
 
             // Uhr
             clock = new THREE.Clock();
@@ -790,7 +791,7 @@
             composer.addPass(bloomPass);
 
             // --- Beleuchtung für MeshStandardMaterial ---
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.1); // Ambient stark reduziert für mehr Kontrast
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.1); // Ambient stark reduziert für mehr Kontrast
             scene.add(ambientLight);
             
             // PointLight entfernt/angepasst - wird durch Headlight ersetzt oder als Kabinenlicht genutzt
@@ -1711,7 +1712,7 @@
 
 
                 // 5. Bahnhofsbeleuchtung
-                const stationLight1 = new THREE.PointLight(0xffffee, 1.5, 30, 2);
+                const stationLight1 = new THREE.PointLight(0xffffee, 0.2, 120, 2);
                 stationLight1.position.set(platformOffset, platformHeight + stationWallHeight - 0.5, -station.length / 4); 
                 stationLight1.isStationLight = true; 
                 stationGroup.add(stationLight1);
@@ -2138,7 +2139,13 @@
 
             // Settings Toggles
             document.getElementById('headlight-toggle').addEventListener('change', (e) => {
-                if (headlight) headlight.visible = e.target.checked;
+                const isHeadlightOn = e.target.checked;
+                if (headlight) headlight.visible = isHeadlightOn;
+
+                // Wenn Scheinwerfer aus, Ambient Light erhöhen, um Tunnel sichtbar zu machen
+                if (ambientLight) {
+                    ambientLight.intensity = isHeadlightOn ? 0.1 : 0.5;
+                }
             });
 
             document.getElementById('sound-toggle').addEventListener('change', (e) => {
