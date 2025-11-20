@@ -2571,12 +2571,14 @@
             const lookDownOffset = -0.3; 
              _camLookAtTarget.addScaledVector(_camNormal, lookDownOffset); 
 
-            // Camera Shake
+            // Camera Shake (Disabled per user request)
+            /*
             const speedShake = Math.max(0, window.playerSpeed) * 0.002;
             const shakeX = (Math.random() - 0.5) * speedShake;
             const shakeY = (Math.random() - 0.5) * speedShake;
             const shakeZ = (Math.random() - 0.5) * speedShake;
             camera.position.add(new THREE.Vector3(shakeX, shakeY, shakeZ));
+            */
 
             // Dynamischen Up-Vektor verwenden
             camera.up.copy(_camNormal); 
