@@ -773,22 +773,22 @@
             scene.add(ambientLight);
             
             // PointLight entfernt/angepasst - wird durch Headlight ersetzt oder als Kabinenlicht genutzt
-            const cabinLight = new THREE.PointLight(0xffaa00, 0.1, 10, 1);
-            cabinLight.position.set(0, 1.5, 0);
-            camera.add(cabinLight); // Licht reist mit der Kamera (Kabine)
+            //const cabinLight = new THREE.PointLight(0xffaa00, 0.1, 10, 1);
+            //cabinLight.position.set(0, 1.5, 0);
+            //camera.add(cabinLight); // Licht reist mit der Kamera (Kabine)
 
             // --- Scheinwerfer (Headlight) mit Schatten ---
-            const headlight = new THREE.SpotLight(0xffffee, 2.0, 300, Math.PI / 5, 0.3, 1);
-            headlight.position.set(0, 2.0, -1.0); // Etwas höher
-            headlight.target.position.set(0, 1.0, -50);
-            headlight.castShadow = true;
-            headlight.shadow.mapSize.width = 2048; // High quality shadows
-            headlight.shadow.mapSize.height = 2048;
-            headlight.shadow.bias = -0.00005; // Reduce shadow acne
-            headlight.shadow.camera.near = 0.5;
-            headlight.shadow.camera.far = 150;
-            camera.add(headlight);
-            camera.add(headlight.target);
+            const headlight = new THREE.SpotLight(0xffffee, 2.0, 800, Math.PI / 5, 0.3, 1); 
+			headlight.position.set(0, 2.0, -1.0);
+			headlight.target.position.set(0, 1.0, -50);
+			headlight.castShadow = true;
+			headlight.shadow.mapSize.width = 2048;
+			headlight.shadow.mapSize.height = 2048;
+			headlight.shadow.bias = -0.00005;
+			headlight.shadow.camera.near = 0.1;
+			headlight.shadow.camera.far = 800; // Wichtig! Muss >= Lichtreichweite sein!
+			camera.add(headlight);
+			camera.add(headlight.target);
             
             // HemisphereLight reduziert
             const hemisphereLight = new THREE.HemisphereLight(0x202020, 0x101010, 0.4);
