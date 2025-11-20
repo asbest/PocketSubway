@@ -803,8 +803,8 @@
 			headlight.position.set(0, 2.0, -1.0);
 			headlight.target.position.set(0, 1.0, -50);
 			headlight.castShadow = true;
-			headlight.shadow.mapSize.width = 2048;
-			headlight.shadow.mapSize.height = 2048;
+			headlight.shadow.mapSize.width = 1024;
+			headlight.shadow.mapSize.height = 1024;
 			headlight.shadow.bias = -0.00005;
 			headlight.shadow.camera.near = 0.1;
 			headlight.shadow.camera.far = 800; // Wichtig! Muss >= Lichtreichweite sein!
@@ -1397,6 +1397,7 @@
             const tieCount = Math.floor(totalTrackLength / 1.5);
             const tieMesh = new THREE.InstancedMesh(tieGeo, tieMaterial, tieCount);
             tieMesh.receiveShadow = true; // Schatten empfangen
+            tieMesh.castShadow = false; // Performance Optimierung
 
             const dummy = new THREE.Object3D();
             const lookAtPos = new THREE.Vector3();
@@ -1445,12 +1446,10 @@
         function createTunnelLights(curve, tunnelOffsetY) {
             const lightSpacing = 100;
             const lightColor = 0xffaa00; // Warm/Orangeish
-            const lightIntensity = 1.0;
-            const lightDistance = 60; // Range
 
             // Geometry for the lamp fixture
             const lampGeo = new THREE.BoxGeometry(0.5, 0.2, 0.2);
-            const lampMat = new THREE.MeshStandardMaterial({ color: 0x888888, emissive: lightColor, emissiveIntensity: 0.8 });
+            const lampMat = new THREE.MeshStandardMaterial({ color: 0x888888, emissive: lightColor, emissiveIntensity: 4.0 });
 
             // Count how many lights
             const lightCount = Math.floor(totalTrackLength / lightSpacing);
@@ -1498,11 +1497,6 @@
 
                 lampMesh.setMatrixAt(lightIndex, dummy.matrix);
 
-                // Add PointLight
-                const pointLight = new THREE.PointLight(lightColor, lightIntensity, lightDistance, 2);
-                pointLight.position.copy(ceilingPos.clone().addScaledVector(normal, -0.5)); // Slightly below the fixture
-                trackGroup.add(pointLight);
-
                 lightIndex++;
             }
 
@@ -1522,7 +1516,7 @@
 
             const archCount = Math.floor(totalTrackLength / archSpacing);
             const archMesh = new THREE.InstancedMesh(archGeo, archMat, archCount);
-            archMesh.castShadow = true; // Schatten werfen
+            archMesh.castShadow = false; // Performance Optimierung
             archMesh.receiveShadow = true;
 
             const dummy = new THREE.Object3D();
@@ -1582,9 +1576,9 @@
             const cableMesh2 = new THREE.InstancedMesh(cableGeo2, cableMaterial, cableCount);
             const cableMesh3 = new THREE.InstancedMesh(cableGeo2, cableMaterial, cableCount);
 
-            cableMesh1.castShadow = true;
-            cableMesh2.castShadow = true;
-            cableMesh3.castShadow = true;
+            cableMesh1.castShadow = false; // Performance Optimierung
+            cableMesh2.castShadow = false;
+            cableMesh3.castShadow = false;
 
             const dummy = new THREE.Object3D();
             const pos = new THREE.Vector3();
