@@ -2186,7 +2186,7 @@
             ui.scoreMultiplierLevelDisplay.innerText = scoreMultiplierLevel;
 
             // Kosten dynamisch berechnen:
-			const calcCost = (baseCost, level) => Math.floor(baseCost * level / 2);
+			const calcCost = (baseCost, level) => Math.floor(baseCost * level / 4);
 
             ui.buyAccelerationButton.dataset.cost = calcCost(150, accelerationLevel);
             ui.buyBrakingButton.dataset.cost = calcCost(150, brakingLevel);
