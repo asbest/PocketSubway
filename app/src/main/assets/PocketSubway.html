@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pocket Subway</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <script type="importmap">
         {
             "imports": {
@@ -15,8 +13,40 @@
             }
         }
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <!--
+        <script src="https://cdn.tailwindcss.com"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+   ROBUST LIBRARY LOADER v5
+   - Synchronous Fallback using document.write
+   - Prevents Race Conditions
+ -->
+
+    <script src="tailwindcss.js"></script>
+    <script>
+        if (typeof tailwind === 'undefined') {
+            console.warn("[Tailwind] Local failed. Loading CDN...");
+            document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+        }
+    </script>
+
+    <script src="tone.js"></script>
+    <script>
+        if (typeof Tone === 'undefined') {
+            console.warn("[Tone] Local failed. Loading CDN...");
+            document.write('<script src="https://unpkg.com/tone@14.7.77/build/Tone.js"><\/script>');
+        }
+    </script>
+
+    <script>
+        window.addEventListener('load', function() {
+            console.log("Libraries processed. Starting...");
+            if (typeof main === 'function') main();
+        });
+    </script>
+
     <style>
         body {
             font-family: 'Inter', sans-serif;
