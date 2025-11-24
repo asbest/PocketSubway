@@ -1567,11 +1567,11 @@
         }
 
         function createTunnelDetails(curve, tunnelOffsetY) {
-            const cableSpacing = 6;
+            const cableSpacing = 50;
             const cableCount = Math.floor(totalTrackLength / cableSpacing);
 
-            const cableGeo1 = new THREE.CylinderGeometry(0.1, 0.1, cableSpacing, 6);
-            const cableGeo2 = new THREE.CylinderGeometry(0.05, 0.05, cableSpacing, 6);
+            const cableGeo1 = new THREE.CylinderGeometry(0.1, 0.1, 3, 6);
+            const cableGeo2 = new THREE.CylinderGeometry(0.05, 0.05, 3, 6);
 
             const cableMesh1 = new THREE.InstancedMesh(cableGeo1, cableMaterial, cableCount);
             const cableMesh2 = new THREE.InstancedMesh(cableGeo2, cableMaterial, cableCount);
