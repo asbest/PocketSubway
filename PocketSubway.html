@@ -91,6 +91,9 @@
                 <button id="restart-button" class="bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
                     Neustart
                 </button>
+                <button id="achievements-button" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
+                    Tägliche Aufgaben
+                </button>
 
                 <!-- Einstellungen -->
                 <div class="flex space-x-8 mt-8 justify-center">
@@ -165,6 +168,16 @@
             </div>
             <button id="close-upgrade-menu-button" class="mt-8 bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 px-6 rounded-lg text-xl">
                 Weiter
+            </button>
+        </div>
+
+        <div id="achievements-menu" class="hidden w-full max-w-4xl mx-auto">
+            <h1 class="text-6xl font-bold mb-8 text-center">TÄGLICHE AUFGABEN</h1>
+            <div id="achievements-list" class="bg-black bg-opacity-50 p-6 rounded-lg space-y-4">
+                <!-- Dynamically populated -->
+            </div>
+            <button id="close-achievements-menu-button" class="mt-8 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-lg text-xl">
+                Zurück
             </button>
         </div>
     </div>
@@ -670,6 +683,13 @@
         let scheduleTimer = null; // Die `setInterval`-ID für den Fahrplan-Countdown.
         let isPaused = false; // Zustand des Pausenmenüs.
 
+        // --- Daily Achievements Variablen ---
+        let totalDistanceTraveled = 0; // Kumulative Distanz für Achievements
+        let dailyAchievements = {
+            date: "",
+            list: []
+        };
+
         // --- Upgrade-System Variablen ---
         let accelerationLevel = 1; // Das aktuelle Level für die Beschleunigung.
         let brakingLevel = 1; // Das aktuelle Level für die Bremskraft.
@@ -734,6 +754,12 @@
             upgradesButton: document.getElementById('upgrades-button'), // This is now the icon button
             closeUpgradeMenuButton: document.getElementById('close-upgrade-menu-button'), // New button
             accelerationLevelDisplay: document.getElementById('acceleration-level'),
+
+            // Achievements Menu UI
+            achievementsButton: document.getElementById('achievements-button'),
+            achievementsMenu: document.getElementById('achievements-menu'),
+            achievementsList: document.getElementById('achievements-list'),
+            closeAchievementsMenuButton: document.getElementById('close-achievements-menu-button'),
             buyAccelerationButton: document.getElementById('buy-acceleration'),
             brakingLevelDisplay: document.getElementById('braking-level'),
             buyBrakingButton: document.getElementById('buy-braking'),
@@ -830,6 +856,9 @@
             // Standard-Upgrade-Werte anwenden
             applyUpgrades();
             
+            // Daily Achievements initialisieren
+            initializeDailyAchievements();
+
             // Stats initialisieren und hinzufügen - FPS Counter wird nicht mehr genutzt
             // stats = new Stats();
             // stats.domElement.style.position = 'absolute'; 
@@ -2076,6 +2105,22 @@
             ui.resumeButton.addEventListener('click', togglePause);
             ui.closeUpgradeMenuButton.addEventListener('click', togglePause); // New button also unpauses
 
+            // Achievements Menu Listeners
+            ui.achievementsButton.addEventListener('click', () => {
+                if (!isPaused) {
+                    togglePause(); // Ensure paused
+                }
+                ui.mainPauseMenu.classList.add('hidden');
+                ui.achievementsMenu.classList.remove('hidden');
+                updateAchievementsUI();
+            });
+
+            ui.closeAchievementsMenuButton.addEventListener('click', () => {
+                // Back to main pause menu
+                ui.achievementsMenu.classList.add('hidden');
+                ui.mainPauseMenu.classList.remove('hidden');
+            });
+
             ui.restartButton.addEventListener('click', () => {
                 window.location.reload();
             });
@@ -2169,6 +2214,103 @@
 
             // Update status message specifically for passenger exchange
             ui.statusMessage.innerText += message; // Append to existing message
+
+            updateAchievementProgress('passengers', arrivingPassengers);
+        }
+
+        // --- Daily Achievements Logik ---
+        function initializeDailyAchievements() {
+            const today = new Date().toISOString().split('T')[0];
+
+            if (dailyAchievements.date !== today) {
+                // Reset oder Init für neuen Tag
+                dailyAchievements = {
+                    date: today,
+                    list: [
+                        { id: 'distance', description: 'Strecken-König: Fahre 5 km', target: 5000, current: 0, completed: false, reward: 500, unit: 'm' },
+                        { id: 'passengers', description: 'Menschenfreund: Befördere 50 Passagiere', target: 50, current: 0, completed: false, reward: 300, unit: 'Pax' },
+                        { id: 'punctual', description: 'Pünktlichkeits-Profi: 3 pünktliche Ankünfte', target: 3, current: 0, completed: false, reward: 400, unit: '' }
+                    ]
+                };
+                totalDistanceTraveled = 0; // Reset daily distance tracking
+                console.log("Daily Achievements reset for: " + today);
+            }
+        }
+
+        function updateAchievementProgress(id, amount) {
+            const achievement = dailyAchievements.list.find(a => a.id === id);
+            if (!achievement || achievement.completed) return;
+
+            achievement.current += amount;
+            if (achievement.current >= achievement.target) {
+                achievement.current = achievement.target;
+                achievement.completed = true;
+                window.credits += achievement.reward;
+
+                // Notification
+                const message = `Aufgabe erledigt: ${achievement.description.split(':')[0]}! +${achievement.reward} Credits`;
+                // Wir nutzen ui.statusMessage kurz, falls sie nicht belegt ist, oder überschreiben sie
+                 ui.statusMessage.dataset.achievement = id; // Prevent overwriting by loop
+                 ui.statusMessage.innerText = message;
+                 ui.statusMessage.classList.remove('hidden', 'bg-red-500', 'bg-blue-600');
+                 ui.statusMessage.classList.add('bg-green-500');
+                 setTimeout(() => {
+                     // Check if message is still the same before hiding
+                     if (ui.statusMessage.dataset.achievement === id) {
+                         ui.statusMessage.classList.add('hidden');
+                         delete ui.statusMessage.dataset.achievement;
+                     }
+                 }, 4000);
+            }
+        }
+
+        function updateAchievementsUI() {
+            ui.achievementsList.innerHTML = '';
+
+            dailyAchievements.list.forEach(ach => {
+                const item = document.createElement('div');
+                item.className = 'flex flex-col bg-gray-800 p-4 rounded-md space-y-2';
+
+                const header = document.createElement('div');
+                header.className = 'flex justify-between items-center';
+
+                const title = document.createElement('h3');
+                title.className = 'text-xl font-bold';
+                title.innerText = ach.description;
+                if (ach.completed) {
+                    title.classList.add('text-green-500');
+                    title.innerText += ' (Erledigt)';
+                }
+
+                const reward = document.createElement('div');
+                reward.className = 'text-right text-yellow-400 font-bold';
+                reward.innerText = `+${ach.reward} C`;
+
+                header.appendChild(title);
+                header.appendChild(reward);
+
+                // Progress Bar
+                const progressContainer = document.createElement('div');
+                progressContainer.className = 'w-full bg-gray-700 rounded-full h-4';
+
+                const progressBar = document.createElement('div');
+                const pct = Math.min(100, (ach.current / ach.target) * 100);
+                progressBar.className = 'bg-blue-500 h-4 rounded-full transition-all duration-500';
+                progressBar.style.width = `${pct}%`;
+                if (ach.completed) progressBar.classList.replace('bg-blue-500', 'bg-green-500');
+
+                progressContainer.appendChild(progressBar);
+
+                const progressText = document.createElement('p');
+                progressText.className = 'text-sm text-gray-400 text-right';
+                progressText.innerText = `${Math.floor(ach.current)} / ${ach.target} ${ach.unit}`;
+
+                item.appendChild(header);
+                item.appendChild(progressContainer);
+                item.appendChild(progressText);
+
+                ui.achievementsList.appendChild(item);
+            });
         }
 
         // --- Upgrade-System Logik ---
@@ -2246,7 +2388,7 @@
             try {
                 // Umfassenderer Spielzustand
                 const gameState = {
-                    saveVersion: 3, // Zur späteren Unterscheidung von alten Speicherständen
+                    saveVersion: 4, // Version erhöht
 
                     // Spieler-Zustand
                     playerDistance: window.playerDistance,
@@ -2255,6 +2397,10 @@
                     brake: window.brake,
                     credits: window.credits,
                     passengers: passengers,
+
+                    // Achievements Data
+                    dailyAchievements: dailyAchievements,
+                    totalDistanceTraveled: totalDistanceTraveled,
 
                     // Upgrade Levels
                     accelerationLevel: accelerationLevel,
@@ -2341,6 +2487,18 @@
                         }
 
                         // --- Laden des neuen, vollständigen Spielstands (v3+) ---
+
+                        // Achievements Laden
+                        if (gameState.saveVersion >= 4 && gameState.dailyAchievements) {
+                            dailyAchievements = gameState.dailyAchievements;
+                            totalDistanceTraveled = gameState.totalDistanceTraveled || 0;
+
+                            // Check reset on load (if day changed while offline)
+                            initializeDailyAchievements();
+                        } else {
+                            // Migration or fresh init
+                            initializeDailyAchievements();
+                        }
 
                         // Upgrade-Level laden
                         accelerationLevel = gameState.accelerationLevel || 1;
@@ -2564,6 +2722,13 @@
 
             if (playerDistance > totalTrackLength) playerDistance -= totalTrackLength;
             if (playerDistance < 0) playerDistance += totalTrackLength;
+
+            // Distance Tracking for Achievements
+            const distanceMoved = window.playerSpeed * dt;
+            if (distanceMoved > 0) {
+                totalDistanceTraveled += distanceMoved;
+                updateAchievementProgress('distance', distanceMoved);
+            }
 
             // --- Sound Steuerung ---
             if (audioStarted) {
@@ -2797,6 +2962,7 @@
                                 bonus = Math.round(50 * scoreMultiplier);
                                 window.credits += bonus;
                                 message += `\nPünktlich! +${bonus} Bonus!`;
+                                updateAchievementProgress('punctual', 1);
                             }
                             scheduleTime = 0;
                         }
@@ -2822,7 +2988,7 @@
 
                     } else if (!wasAtStation) {
                         // Zeige eine temporäre "Ankunft"-Nachricht an, wenn keine andere wichtige Nachricht angezeigt wird
-                        if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
+                        if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station && !ui.statusMessage.dataset.achievement) {
                              delete ui.statusMessage.dataset.station; // Vorsichtshalber löschen
                              ui.statusMessage.innerText = `Haltestelle: ${currentStation.name}`;
                              ui.statusMessage.classList.remove('hidden', 'bg-green-500', 'bg-red-500');
@@ -2831,7 +2997,7 @@
                     }
                 } else {
                     // Verstecke die Nachricht nur, wenn keine wichtige, zeitgesteuerte Nachricht aktiv ist
-                    if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
+                    if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station && !ui.statusMessage.dataset.achievement) {
                         ui.statusMessage.classList.add('hidden');
                     }
                 }
@@ -2880,7 +3046,7 @@
 
                 } else {
                     // Verstecke die Nachricht nur, wenn keine wichtige, zeitgesteuerte Nachricht aktiv ist
-                    if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station) {
+                    if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station && !ui.statusMessage.dataset.achievement) {
                        ui.statusMessage.classList.add('hidden');
                     }
                 }
