@@ -1,3335 +1,401 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Pocket Subway</title>
-
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.138.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.138.0/examples/jsm/"
-            }
-        }
-    </script>
-
-    <!--
-        <script src="https://cdn.tailwindcss.com"></script>
- <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js"></script>
- <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-
-   ROBUST LIBRARY LOADER v5
-   - Synchronous Fallback using document.write
-   - Prevents Race Conditions
- -->
-
-    <script src="tailwindcss.js"></script>
-    <script>
-        if (typeof tailwind === 'undefined') {
-            console.warn("[Tailwind] Local failed. Loading CDN...");
-            document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
-        }
-    </script>
-
-    <script src="tone.js"></script>
-    <script>
-        if (typeof Tone === 'undefined') {
-            console.warn("[Tone] Local failed. Loading CDN...");
-            document.write('<script src="https://unpkg.com/tone@14.7.77/build/Tone.js"><\/script>');
-        }
-    </script>
-
-    <script>
-        window.addEventListener('load', function() {
-            console.log("Libraries processed. Starting...");
-            if (typeof main === 'function') main();
-        });
-    </script>
-
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
             margin: 0;
             overflow: hidden;
             background-color: #000;
-            cursor: pointer; /* Zeigt an, dass Klick erwartet wird */
         }
-        #canvas-container {
-            position: fixed;
+
+        canvas {
+            display: block;
+        }
+
+        #ui-container {
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-        }
-        /* Vertikale Slider für Steuerung */
-        input[type=range][orient=vertical] {
-            writing-mode: bt-lr; /* IE */
-            -webkit-appearance: slider-vertical; /* WebKit */
-            appearance: slider-vertical;
-            width: 1.5rem;
-            padding: 0 2px;
-        }
-        #stats {
-            position: absolute;
-            left: 8px !important;
-            top: 8px !important;
-            z-index: 100;
-        }
-        /* Hinweis zum Starten des Audios */
-        #audio-start-prompt {
-            position: fixed;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: rgba(0,0,0,0.8);
+            pointer-events: none;
             color: white;
-            font-size: 1.5rem;
-            text-align: center;
-            z-index: 200;
+            font-family: 'Courier New', Courier, monospace;
         }
+
+        .ui-element {
+            pointer-events: auto;
+        }
+
+        /* Styles for toggle switch */
+        .toggle-label:after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 9999px;
+            background-color: white;
+            transition: 0.2s;
+        }
+        input:checked + .toggle-label {
+            background-color: #4ade80; /* green-400 */
+        }
+        input:checked + .toggle-label:after {
+            transform: translateX(calc(100% - 2px));
+        }
+
     </style>
 </head>
-<body class="text-white">
 
-    <div id="canvas-container"></div>
-    <div id="stats"></div> 
-
-
-    <div id="loading-screen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="text-center">
-            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-            <p class="text-xl mt-4">Generiere Strecke...</p>
-            <p class="text-sm text-gray-400">Das kann einen Moment dauern.</p>
+<body>
+    <div id="ui-container" class="flex flex-col items-center justify-center">
+        <div id="loading-screen" class="absolute inset-0 bg-black flex flex-col items-center justify-center z-50">
+            <div class="text-2xl" data-testid="loading-text">Loading...</div>
         </div>
+
+        <div id="pause-menu" class="hidden absolute inset-0 bg-black bg-opacity-75 flex-col items-center justify-center gap-4 z-40">
+            <div class="text-4xl font-bold mb-8">Paused</div>
+            <button id="resume-button" class="ui-element text-2xl px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Resume</button>
+            <div class="flex items-center gap-4">
+                <label for="headlight-toggle" class="text-xl">Scheinwerfer</label>
+                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="headlight-toggle" id="headlight-toggle" class="sr-only" checked/>
+                    <label for="headlight-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                </div>
+            </div>
+             <div class="flex items-center gap-4">
+                <label for="sound-toggle" class="text-xl">Sound</label>
+                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                    <input type="checkbox" name="sound-toggle" id="sound-toggle" class="sr-only" checked/>
+                    <label for="sound-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                </div>
+            </div>
+            <button id="save-button" class="ui-element text-2xl px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Save Game</button>
+            <button id="load-button" class="ui-element text-2xl px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Load Game</button>
+        </div>
+
+        <div id="in-game-ui" class="absolute bottom-4 right-4 flex flex-col gap-2 text-lg text-right">
+            <div id="speed-display">Speed: 0 km/h</div>
+            <div id="score-display">Score: 0</div>
+            <div id="schedule-display" class="text-yellow-400"></div>
+            <div id="station-info" class="text-cyan-400"></div>
+            <div id="signal-info" class="text-red-500"></div>
+        </div>
+
+        <button id="pause-button" class="ui-element absolute top-4 right-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Pause</button>
+         <button id="door-button" class="ui-element absolute bottom-4 left-4 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Doors</button>
+
     </div>
 
-    <div id="pause-menu" class="fixed inset-0 bg-black bg-opacity-40 flex-col items-center justify-center z-40 hidden">
-        <div id="main-pause-menu">
-            <h1 class="text-6xl font-bold mb-8 text-center">PAUSE</h1>
-            <div class="flex flex-col space-y-4">
-                <button id="resume-button" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Weiter
-                </button>
-                <button id="save-button" class="bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Spiel speichern
-                </button>
-                <button id="load-button" class="bg-yellow-500 hover:bg-yellow-400 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Spiel laden
-                </button>
-                <button id="restart-button" class="bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Neustart
-                </button>
-                <button id="achievements-button" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Tägliche Aufgaben
-                </button>
-
-                <!-- Einstellungen -->
-                <div class="flex space-x-8 mt-8 justify-center">
-                    <!-- Headlight Switch -->
-                    <div class="flex flex-col items-center bg-gray-800 bg-opacity-80 p-4 rounded-lg text-white">
-                        <span class="text-lg font-bold mb-2">Scheinwerfer</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="headlight-toggle" class="sr-only peer" checked>
-                            <div class="w-14 h-7 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-
-                    <!-- Sound Switch -->
-                    <div class="flex flex-col items-center bg-gray-800 bg-opacity-80 p-4 rounded-lg text-white">
-                        <span class="text-lg font-bold mb-2">Sound</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="sound-toggle" class="sr-only peer" checked>
-                            <div class="w-14 h-7 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="upgrade-menu" class="hidden w-full max-w-4xl mx-auto">
-            <h1 class="text-6xl font-bold mb-8 text-center">UPGRADES</h1>
-            <div class="bg-black bg-opacity-50 p-6 rounded-lg space-y-4">
-                <!-- Upgrade Item -->
-                <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
-                    <div>
-                        <h3 class="text-xl font-bold">Bessere Beschleunigung</h3>
-                        <p class="text-sm text-gray-400">Erhöht die Kraft des Antriebs.</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-lg font-mono">Level <span id="acceleration-level">1</span></p>
-                        <button id="buy-acceleration" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Kaufen: 150 C</button>
-                    </div>
-                </div>
-                 <!-- Upgrade Item -->
-                <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
-                    <div>
-                        <h3 class="text-xl font-bold">Stärkere Bremsen</h3>
-                        <p class="text-sm text-gray-400">Verbessert die Bremsleistung.</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-lg font-mono">Level <span id="braking-level">1</span></p>
-                        <button id="buy-braking" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Kaufen: 150 C</button>
-                    </div>
-                </div>
-                <!-- Upgrade Item -->
-                <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
-                    <div>
-                        <h3 class="text-xl font-bold">Höchstgeschwindigkeit</h3>
-                        <p class="text-sm text-gray-400">Ermöglicht höhere Geschwindigkeiten.</p>
-                    </div>
-                     <div class="text-right">
-                        <p class="text-lg font-mono">Level <span id="max-speed-level">1</span></p>
-                        <button id="buy-max-speed" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="250">Kaufen: 250 C</button>
-                    </div>
-                </div>
-                 <!-- Upgrade Item -->
-                <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
-                    <div>
-                        <h3 class="text-xl font-bold">Einnahme-Multiplikator</h3>
-                        <p class="text-sm text-gray-400">Erhöht alle erhaltenen Einnahmen.</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-lg font-mono">Level <span id="score-multiplier-level">1</span></p>
-                        <button id="buy-score-multiplier" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="500">Kaufen: 500 C</button>
-                    </div>
-                </div>
-            </div>
-            <button id="close-upgrade-menu-button" class="mt-8 bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 px-6 rounded-lg text-xl">
-                Weiter
-            </button>
-        </div>
-
-        <div id="achievements-menu" class="hidden w-full max-w-4xl mx-auto">
-            <h1 class="text-6xl font-bold mb-8 text-center">TÄGLICHE AUFGABEN</h1>
-            <div id="achievements-list" class="bg-black bg-opacity-50 p-6 rounded-lg space-y-4">
-                <!-- Dynamically populated -->
-            </div>
-            <button id="close-achievements-menu-button" class="mt-8 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-lg text-xl">
-                Zurück
-            </button>
-        </div>
-    </div>
-
-    <div id="ui-container" class="fixed inset-0 pointer-events-none p-4 md:p-8 flex flex-col justify-between hidden">
-        
-        <div class="w-full flex justify-between items-start text-sm">
-            <div class="bg-black bg-opacity-40 p-2 rounded-lg shadow-lg">
-                <h2 class="text-xs font-semibold text-gray-400">NÄCHSTE HALTESTELLE</h2>
-                <p id="next-station-name" class="text-lg font-bold">Hauptbahnhof</p>
-                <p id="next-station-distance" class="text-base font-mono">1500 m</p>
-            </div>
-            <div id="schedule-display" class="bg-black bg-opacity-40 p-2 rounded-lg shadow-lg text-center hidden">
-                <h2 class="text-xs font-semibold text-gray-400">FAHRPLAN</h2>
-                <p id="schedule-time" class="text-lg font-bold font-mono text-yellow-400">02:30</p>
-            </div>
-            
-            <div class="flex items-start space-x-2">
-                 <div class="flex flex-col items-end space-y-2">
-                    <div class="bg-black bg-opacity-40 p-1.5 rounded-lg shadow-lg text-right pointer-events-auto">
-                         <div class="flex justify-between items-baseline space-x-3">
-                            <div>
-                                <h2 class="text-[10px] font-semibold text-gray-400">CREDITS</h2>
-                                <p id="credits-display" class="text-lg font-bold font-mono">0</p>
-                            </div>
-
-                             <div>
-                                <h2 class="text-[10px] font-semibold text-gray-400">PASSAGIERE</h2>
-                                <p id="passenger-display" class="text-lg font-bold font-mono">0</p>
-                            </div>
-
-                        </div>
-                    </div>
-                    <div class="bg-black bg-opacity-40 p-1.5 rounded-lg shadow-lg text-right">
-                        <h2 class="text-[10px] font-semibold text-gray-400">GESCHWINDIGKEIT</h2>
-                        <p id="speed-display" class="text-lg font-bold font-mono">0</p>
-                        <p class="text-xs text-gray-300">km/h</p>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button id="upgrades-button" title="Upgrades" class="pointer-events-auto bg-black bg-opacity-25 p-2 rounded-lg shadow-lg h-10 w-10 flex items-center justify-center hover:bg-opacity-75 transition-all">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                              <path stroke-linecap="round" stroke-linejoin="round" d="M5 11l7-7 7 7M5 19l7-7 7 7" />
-                            </svg>
-                        </button>
-                        <button id="pause-button" title="Pause" class="pointer-events-auto bg-black bg-opacity-25 p-2 rounded-lg shadow-lg h-10 w-10 flex items-center justify-center hover:bg-opacity-75 transition-all">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="w-full flex justify-between items-end pointer-events-auto">
-            
-            <div class="flex space-x-4 bg-black bg-opacity-40 p-2 rounded-lg shadow-lg items-end">
-                <div class="flex flex-col items-center">
-                    <label for="throttle" class="text-xs font-semibold text-green-400">SCHUB</label>
-                    <input type="range" id="throttle" orient="vertical" min="0" max="100" value="0" class="mt-1 h-24 md:h-32 accent-green-500">
-                    <span id="throttle-value" class="font-mono text-sm mt-1">0%</span>
-                </div>
-                <div class="flex flex-col items-center">
-                    <label for="brake" class="text-xs font-semibold text-red-400">BREMSE</label>
-                    <input type="range" id="brake" orient="vertical" min="0" max="100" value="0" class="mt-1 h-24 md:h-32 accent-red-500">
-                    <span id="brake-value" class="font-mono text-sm mt-1">0%</span>
-                </div>
-            </div>
-
-            <div class="flex flex-col items-end space-y-4">
-                <div id="status-message" class="bg-blue-600 bg-opacity-80 p-3 rounded-lg shadow-lg text-base font-semibold text-center hidden" style="min-width: 250px;">
-                    An Haltestelle angehalten.
-                </div>
-
-                <button id="door-button" class="w-full" disabled>
-                    <div class="bg-gray-700 p-4 rounded-lg shadow-lg transition-all duration-200 cursor-not-allowed opacity-50 flex items-center justify-center space-x-2 h-16 w-16"> 
-                        <svg id="door-icon-svg" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M7 16l-4-4m0 0l4-4m-4 4h18m-4 4l4-4m0 0l-4-4" />
-                        </svg>
-                    </div>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div id="fact-display" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black bg-opacity-75 p-6 rounded-xl max-w-md text-center text-xl hidden z-30 shadow-2xl border border-gray-700">
-    </div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.148.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.148.0/examples/jsm/",
+            "tone": "https://unpkg.com/tone@14.7.77/build/Tone.js"
+        }
+    }
+    </script>
 
     <script type="module">
         import * as THREE from 'three';
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import SimplexNoise from 'https://cdn.skypack.dev/simplex-noise@3.0.0';
+        import * as Tone from 'tone';
 
-        // --- Perlin Noise für prozedurale Texturen ---
-        // Implementierung von SimplexNoise (ähnlich Perlin, aber etwas besser)
-        // Quelle: https://github.com/mrdoob/three.js/blob/master/examples/jsm/math/SimplexNoise.js
-        class SimplexNoise {
-            constructor(r = Math) {
-                this.grad3 = [
-                    [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-                    [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-                    [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1]
-                ];
-                this.p = [];
-                for (let i = 0; i < 256; i++) {
-                    this.p[i] = Math.floor(r.random() * 256);
-                }
-                // To remove the need for modulos, extend the permutation table to 512
-                this.perm = [];
-                for (let i = 0; i < 512; i++) {
-                    this.perm[i] = this.p[i & 255];
-                }
-            }
-
-            dot(g, x, y) {
-                return g[0] * x + g[1] * y;
-            }
-
-            noise2D(xin, yin) {
-                const F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
-                const G2 = (3.0 - Math.sqrt(3.0)) / 6.0;
-                let n0, n1, n2;
-                const s = (xin + yin) * F2;
-                const i = Math.floor(xin + s);
-                const j = Math.floor(yin + s);
-                const t = (i + j) * G2;
-                const X0 = i - t;
-                const Y0 = j - t;
-                const x0 = xin - X0;
-                const y0 = yin - Y0;
-                let i1, j1;
-                if (x0 > y0) {
-                    i1 = 1;
-                    j1 = 0;
-                } else {
-                    i1 = 0;
-                    j1 = 1;
-                }
-                const x1 = x0 - i1 + G2;
-                const y1 = y0 - j1 + G2;
-                const x2 = x0 - 1.0 + 2.0 * G2;
-                const y2 = y0 - 1.0 + 2.0 * G2;
-                const ii = i & 255;
-                const jj = j & 255;
-                let t0 = 0.5 - x0 * x0 - y0 * y0;
-                if (t0 < 0) {
-                    n0 = 0.0;
-                } else {
-                    t0 *= t0;
-                    n0 = t0 * t0 * this.dot(this.grad3[this.perm[ii + this.perm[jj]] % 12], x0, y0);
-                }
-                let t1 = 0.5 - x1 * x1 - y1 * y1;
-                if (t1 < 0) {
-                    n1 = 0.0;
-                } else {
-                    t1 *= t1;
-                    n1 = t1 * t1 * this.dot(this.grad3[this.perm[ii + i1 + this.perm[jj + j1]] % 12], x1, y1);
-                }
-                let t2 = 0.5 - x2 * x2 - y2 * y2;
-                if (t2 < 0) {
-                    n2 = 0.0;
-                } else {
-                    t2 *= t2;
-                    n2 = t2 * t2 * this.dot(this.grad3[this.perm[ii + 1 + this.perm[jj + 1]] % 12], x2, y2);
-                }
-                return 70.0 * (n0 + n1 + n2);
-            }
-        }
-        
+        // --- Basic Setup ---
+        let scene, camera, renderer, composer, headlight;
+        let clock = new THREE.Clock();
+        let isPaused = false;
         const simplex = new SimplexNoise();
+        let audioReady = false;
 
-        function generateNoiseTexture(width, height, options) {
-            const { scale, octaves, persistence, lacunarity, color1, color2 } = options;
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            const imageData = ctx.createImageData(width, height);
-            const data = imageData.data;
+        // --- Game State ---
+        window.playerSpeed = 0;
+        window.throttle = 0;
+        window.brake = 0;
+        window.score = 0;
+        window.playerDistance = 0;
+        let totalTrackLength = 0;
+        let trackGroup = new THREE.Group();
+        let trackCurve;
+        let stations = [];
+        let signals = [];
+        let switchInfo = null;
+        let branchCurve = null;
 
-            const c1 = new THREE.Color(color1);
-            const c2 = new THREE.Color(color2);
-
-            const heightMap = new Float32Array(width * height);
-
-            // 1. Generiere Heightmap
-            for (let x = 0; x < width; x++) {
-                for (let y = 0; y < height; y++) {
-                    let total = 0;
-                    let frequency = 1;
-                    let amplitude = 1;
-                    let maxValue = 0;
-                    
-                    for(let i=0; i < octaves; i++) {
-                        total += simplex.noise2D(x * frequency / scale, y * frequency / scale) * amplitude;
-                        maxValue += amplitude;
-                        amplitude *= persistence;
-                        frequency *= lacunarity;
-                    }
-
-                    const value = (total / maxValue + 1) / 2;
-                    heightMap[y * width + x] = value;
-
-                    const interpolatedColor = new THREE.Color().lerpColors(c1, c2, value);
-                    const i = (y * width + x) * 4;
-                    data[i] = Math.floor(interpolatedColor.r * 255);
-                    data[i + 1] = Math.floor(interpolatedColor.g * 255);
-                    data[i + 2] = Math.floor(interpolatedColor.b * 255);
-                    data[i + 3] = 255;
-                }
-            }
-            ctx.putImageData(imageData, 0, 0);
-            const texture = new THREE.CanvasTexture(canvas);
-
-            // 2. Generiere Normal Map aus Heightmap
-            const normalCanvas = document.createElement('canvas');
-            normalCanvas.width = width;
-            normalCanvas.height = height;
-            const normalCtx = normalCanvas.getContext('2d');
-            const normalImageData = normalCtx.createImageData(width, height);
-            const normalData = normalImageData.data;
-
-            for (let x = 0; x < width; x++) {
-                for (let y = 0; y < height; y++) {
-                    // Sobel Filter zur Normalen-Berechnung
-                    const xLeft = (x - 1 + width) % width;
-                    const xRight = (x + 1) % width;
-                    const yUp = (y - 1 + height) % height;
-                    const yDown = (y + 1) % height;
-
-                    const hL = heightMap[y * width + xLeft];
-                    const hR = heightMap[y * width + xRight];
-                    const hU = heightMap[yUp * width + x];
-                    const hD = heightMap[yDown * width + x];
-
-                    const dx = (hR - hL) * 2.0; // Stärke skalierbar
-                    const dy = (hD - hU) * 2.0;
-                    const dz = 1.0 / 5.0; // "Flachheit"
-
-                    const vec = new THREE.Vector3(-dx, -dy, dz).normalize();
-
-                    const i = (y * width + x) * 4;
-                    normalData[i] = Math.floor((vec.x * 0.5 + 0.5) * 255);
-                    normalData[i + 1] = Math.floor((vec.y * 0.5 + 0.5) * 255);
-                    normalData[i + 2] = Math.floor((vec.z * 0.5 + 0.5) * 255);
-                    normalData[i + 3] = 255;
-                }
-            }
-            normalCtx.putImageData(normalImageData, 0, 0);
-            const normalTexture = new THREE.CanvasTexture(normalCanvas);
-
-            return { texture, normalTexture };
-        }
-
-        function generateBrickTexture(width, height) {
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-
-            const normalCanvas = document.createElement('canvas');
-            normalCanvas.width = width;
-            normalCanvas.height = height;
-            const normalCtx = normalCanvas.getContext('2d');
-
-            const brickWidth = 60;
-            const brickHeight = 20;
-            const mortarThickness = 4;
-            const brickColor = '#8B4513';
-            const mortarColor = '#555555'; // Etwas dunkler für Diffuse
-
-            // --- Diffuse Map ---
-            ctx.fillStyle = mortarColor;
-            ctx.fillRect(0, 0, width, height);
-
-            // --- Normal Map Hintergrund (flach, blau) ---
-            normalCtx.fillStyle = 'rgb(128, 128, 255)';
-            normalCtx.fillRect(0, 0, width, height);
-
-            for (let y = 0; y < height; y += brickHeight + mortarThickness) {
-                for (let x = 0; x < width; x += brickWidth + mortarThickness) {
-                    let offsetX = 0;
-                    if ((y / (brickHeight + mortarThickness)) % 2 === 1) {
-                        offsetX = -(brickWidth + mortarThickness) / 2;
-                    }
-
-                    // Zeichne Color
-                    ctx.fillStyle = brickColor;
-                    ctx.fillRect(x + offsetX, y, brickWidth, brickHeight);
-                    if (offsetX !== 0) ctx.fillRect(x + offsetX + width, y, brickWidth, brickHeight);
-
-                    // Zeichne Normals (Simulierter "Bevel" Effekt)
-                    // Innenbereich flach (nach vorne, z=1 -> blau)
-                    normalCtx.fillStyle = 'rgb(128, 128, 255)';
-                    normalCtx.fillRect(x + offsetX + 2, y + 2, brickWidth - 4, brickHeight - 4);
-                    if (offsetX !== 0) normalCtx.fillRect(x + offsetX + width + 2, y + 2, brickWidth - 4, brickHeight - 4);
-
-                    // Kanten simulieren (einfach) - könnte man aufwändiger machen, aber das reicht für den Effekt
-                    // Oben/Links (Licht kommt von oben links -> heller)
-                    // Unten/Rechts (Licht abgewandt -> dunkler)
-                    // Für Normal Maps: Schräge Flächen kodieren.
-                }
-            }
-
-            // Rauschen über Ziegel legen für Normal Map Details
-            const imageData = normalCtx.getImageData(0,0, width, height);
-            const data = imageData.data;
-            for(let i=0; i<data.length; i+=4) {
-                 if (data[i+2] > 200) { // Nur auf den Ziegeln (blau)
-                     const noise = (Math.random() - 0.5) * 20;
-                     data[i] = Math.min(255, Math.max(0, data[i] + noise));
-                     data[i+1] = Math.min(255, Math.max(0, data[i+1] + noise));
-                 }
-            }
-            normalCtx.putImageData(imageData, 0, 0);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
-
-            const normalTexture = new THREE.CanvasTexture(normalCanvas);
-
-            return { texture, normalTexture };
-        }
-
-        function generateFunnyStationName() {
-            const prefixes = ['Groß', 'Klein', 'Alt', 'Neu', 'Ober', 'Unter', 'Bad', 'Sankt', 'Prost'];
-            const middles = ['Kicher', 'Enten', 'Gänse', 'Frosch', 'Mäuse', 'Katzen', 'Hunde', 'Brumm', 'Donner', 'Nebel', 'Schatten'];
-            const suffixes = ['bach', 'hausen', 'tal', 'berg', 'dorf', 'stadt', 'burg', 'moor', 'wald', 'hafen', 'brück'];
-
-            const hasPrefix = Math.random() > 0.3; // 70% Wahrscheinlichkeit für ein Präfix
-            const prefix = hasPrefix ? prefixes[Math.floor(Math.random() * prefixes.length)] + '-' : '';
-            const middle = middles[Math.floor(Math.random() * middles.length)];
-            const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-
-            return prefix + middle + suffix;
-        }
-
-        const subwayFacts = [
-            "Die erste U-Bahn der Welt fuhr am 10. Januar 1863 in London.",
-            "Die Londoner U-Bahn wird liebevoll 'The Tube' (Die Röhre) genannt.",
-            "Das U-Bahn-Netz von Shanghai ist das größte der Welt mit über 800 km Streckenlänge.",
-            "Nur 45% des Londoner U-Bahn-Netzes verläuft tatsächlich unterirdisch.",
-            "Die tiefste U-Bahn-Station der Welt ist Arsenalna in Kiew, 105,5 Meter unter der Oberfläche.",
-            "Die U-Bahn von Stockholm wird oft als die längste Kunstgalerie der Welt bezeichnet, da über 90 der 100 Stationen dekoriert sind.",
-            "In der Moskauer U-Bahn gibt es eine Ringlinie, auf der die Ansagen im Uhrzeigersinn von einer männlichen und gegen den Uhrzeigersinn von einer weiblichen Stimme gesprochen werden.",
-            "Während des Zweiten Weltkriegs wurden viele Londoner U-Bahn-Stationen als Luftschutzbunker genutzt.",
-            "Die New Yorker U-Bahn ist eines der wenigen 24-Stunden-Systeme der Welt.",
-            "In der U-Bahn von Toronto gibt es eine 'Geisterstation' namens Lower Bay, die für Filmaufnahmen genutzt wird.",
-            "Die U-Bahn in Pjöngjang, Nordkorea, liegt so tief, dass sie auch als Atomschutzbunker dient. Ausgemusterte Berliner U-Bahn-Wagen sind dort noch im Einsatz.",
-            "Einige Züge verfügen über Sandstreuer, um bei rutschigen Schienen (z.B. durch Laub) die Reibung zu erhöhen.",
-            "Weichen sind oft beheizt, damit sie im Winter nicht einfrieren und funktionsfähig bleiben.",
-            "Das 'U' in U-Bahn steht ursprünglich für 'unabhängig', da die Bahn auf einem vom restlichen Verkehr getrennten Schienennetz fährt.",
-            "In vielen Bahnhöfen sind metallbeschichtete Luftballons verboten, da sie Kurzschlüsse in den Oberleitungen verursachen können.",
-            "In den Tunneln der Londoner U-Bahn lebt eine eigene Mückenart, die sich an das unterirdische Leben angepasst hat.",
-            "Die kürzeste U-Bahn-Linie der Welt ist die 'Tünel' in Istanbul, die nur 573 Meter lang ist.",
-            "Die Pariser Métro hat so viele Stationen, dass man von keinem Punkt in der Stadt mehr als 500 Meter zur nächsten Station laufen muss.",
-            "Die U-Bahn von Mexiko-Stadt fährt auf Gummireifen statt auf Stahlrädern, was für eine ruhigere Fahrt sorgt.",
-            "In der U-Bahn von Helsinki können Fahrgäste in einer speziellen Sauna-Gondel fahren.",
-            "Der U-Bahnhof Hermannplatz in Berlin war der erste, der mit einer Rolltreppe ausgestattet wurde.",
-            "Der Geruch der Londoner U-Bahn ist so einzigartig, dass er 2001 als Markenzeichen geschützt werden sollte.",
-            "Die Berliner U-Bahn hat zwei verschiedene Profile: Kleinprofil (U1-U4) und Großprofil (U5-U9) mit unterschiedlich breiten Zügen.",
-            "Einige Stationen der Münchner U-Bahn wurden von bekannten Künstlern wie Joseph Beuys gestaltet.",
-            "Die U-Bahn in Dubai ist komplett fahrerlos und wird von einem zentralen System gesteuert.",
-            "Die schnellste U-Bahn der Welt ist der Maglev in Shanghai, der Geschwindigkeiten von bis zu 431 km/h erreicht.",
-            "In der U-Bahn von Kairo gibt es separate Wagen nur für Frauen.",
-            "Die erste U-Bahn auf dem afrikanischen Kontinent wurde 1987 in Kairo eröffnet.",
-            "Der U-Bahnhof Solna Centrum in Stockholm sieht aus wie eine feuerrote Höhle und soll die 'Tore zur Hölle' darstellen.",
-            "Die U-Bahn von Buenos Aires hat noch historische Holzwagen aus den 1910er Jahren im Einsatz.",
-            "Die U-Bahn in Athen ist ein rollendes Museum. Beim Bau wurden so viele archäologische Schätze gefunden, dass viele Stationen sie ausstellen.",
-            "Es gibt eine unvollendete 'Geisterlinie' (U10) in Berlin, deren Tunnel teilweise für Veranstaltungen genutzt werden.",
-            "Die U-Bahn in Glasgow ist die drittälteste der Welt und hat eine kreisförmige Linie, die 'The Clockwork Orange' genannt wird.",
-            "Auf der U-Bahn-Linie 1 in New York gibt es eine vergessene Station namens 'City Hall Loop' mit beeindruckender Architektur, die man auf Sonderfahrten besichtigen kann.",
-            "Die U-Bahn in Santiago de Chile gilt als eine der modernsten und saubersten in Lateinamerika.",
-            "In der U-Bahn von Tokio gibt es Mitarbeiter (Oshiya), deren Aufgabe es ist, Fahrgäste in die vollen Züge zu schieben.",
-            "Die Station 'Canary Wharf' in London wurde in einem ehemaligen Hafenbecken gebaut und ist groß genug, um einen Wolkenkratzer liegend aufzunehmen.",
-            "Die U-Bahn von São Paulo befördert täglich über 4 Millionen Menschen und ist eines der verkehrsreichsten Netze der Welt.",
-            "Der U-Bahnhof 'Gare du Nord' in Paris ist der verkehrsreichste in Europa.",
-            "Die U-Bahn von Budapest ist die älteste elektrisch betriebene U-Bahn auf dem europäischen Festland (1896).",
-            "Einige Stationen der Moskauer U-Bahn sind so prunkvoll mit Marmor, Mosaiken und Kronleuchtern ausgestattet, dass sie 'unterirdische Paläste' genannt werden.",
-            "Die U-Bahn in Kopenhagen ist 24/7 in Betrieb und fährt fahrerlos.",
-            "Der längste U-Bahn-Tunnel der Welt ist der der Linie 3 in Guangzhou, China, mit einer Länge von 60,4 km.",
-            "Die U-Bahn von Taipeh (Taiwan) ist bekannt für ihre Sauberkeit und Pünktlichkeit.",
-            "In den Tunneln der U-Bahn von Singapur ist das Essen und Trinken von Durian-Früchten wegen ihres starken Geruchs streng verboten.",
-            "Die U-Bahn von Montreal hat wie die in Mexiko-Stadt Züge mit Gummireifen.",
-            "Die Station 'Westfriedhof' in München ist berühmt für ihre riesigen, farbigen Lampen, die eine einzigartige Atmosphäre schaffen.",
-            "Die U-Bahn in Washington D.C. ist bekannt für ihre beeindruckende, gewölbte Architektur aus Beton.",
-            "In der U-Bahn von Seoul sind die Sitze im Winter beheizt.",
-            "Die Linie 14 der Pariser Métro war die erste vollautomatische Linie der Stadt.",
-            "Die U-Bahn von Algier war die erste Metro im Maghreb.",
-            "Die 'Mail Rail' in London war eine fahrerlose Post-U-Bahn, die über 75 Jahre lang Briefe unter der Stadt transportierte und heute ein Museum ist.",
-            "Der U-Bahnhof 'Toledo' in Neapel wurde als schönster Europas ausgezeichnet und ist bekannt für sein beeindruckendes Lichtkunstwerk.",
-            "Die U-Bahn in Wien wird teilweise aus der Energie betrieben, die beim Bremsen der Züge zurückgewonnen wird (Rekuperation).",
-            "In einem U-Bahnhof in Berlin (Bülowstraße) gab es in den 70er Jahren einen Flohmarkt in einem stillgelegten Zug.",
-            "Die U-Bahn in Oslo fährt bis auf die Skipisten am Holmenkollen.",
-            "Die U-Bahn von Bilbao wurde vom berühmten Architekten Norman Foster entworfen und hat charakteristische Glaseingänge namens 'Fosteritos'.",
-            "Einige der Belüftungsgitter der New Yorker U-Bahn sind als kunstvolle Skulpturen getarnt.",
-            "Die U-Bahn von Vancouver (SkyTrain) ist eines der längsten vollautomatischen Nahverkehrssysteme der Welt.",
-            "Die U-Bahn von Bangkok hat spezielle Mönchssitze, die für buddhistische Mönche reserviert sind.",
-            "Die U-Bahn in Prag hat eine Station (Anděl), die mit Engeln und Teufeln dekoriert ist, ein Verweis auf den früheren Namen 'Moskevská'.",
-            "Die U-Bahn in Rotterdam hat einen oberirdischen Abschnitt, der durch ein Wohnhaus führt.",
-            "In der U-Bahn von Brüssel gibt es über 80 Kunstwerke, die in den Stationen permanent ausgestellt sind.",
-            "Die U-Bahn von Mailand ist bekannt für ihr klares und rationalistisches Design von Franco Albini und Bob Noorda.",
-            "Die U-Bahn in Warschau wurde erst 1995 eröffnet, obwohl die Planungen bereits in den 1920er Jahren begannen.",
-            "Die U-Bahn in Lissabon ist berühmt für ihre kunstvollen Kacheln (Azulejos) in den Stationen.",
-            "Die U-Bahn von Barcelona hat zwei verschiedene Spurweiten, was auf die unterschiedlichen Bahngesellschaften zurückgeht, die das Netz ursprünglich bauten.",
-            "Die U-Bahn in Jekaterinburg ist die kürzeste der Welt mit nur 7 Stationen.",
-            "Die U-Bahn in Mumbai wurde gebaut, um die notorisch überfüllten Vorortzüge zu entlasten.",
-            "Die U-Bahn in Teheran hat spezielle Waggons und Eingänge für Frauen, die getrennt reisen möchten.",
-            "Die U-Bahn in Kaohsiung (Taiwan) hat die größte Glasinstallation der Welt in der Station Formosa Boulevard.",
-            "Die U-Bahn in Hamburg (Hochbahn) fährt zu großen Teilen auf Viadukten und ist eine der ältesten in Deutschland.",
-            "Die U-Bahn in Nürnberg war die erste in Deutschland, die vollautomatisch fuhr.",
-            "Die U-Bahn von Rom ist relativ klein, da Bauarbeiten oft durch archäologische Funde verzögert werden.",
-            "Die U-Bahn in Amsterdam hat eine Linie, die unter dem Fluss IJ in einem Tunnel verläuft, der abgesenkt wurde.",
-            "Die U-Bahn in Los Angeles ist ein relativ junges System, das in einer Stadt gebaut wurde, die für ihre Autokultur bekannt ist.",
-            "Die U-Bahn in Kuala Lumpur hat die längste vollautomatische Linie der Welt.",
-            "Die U-Bahn in Kasan (Russland) hat Stationen, die nach berühmten tatarischen Dichtern und Schriftstellern benannt sind.",
-            "Die U-Bahn in Caracas (Venezuela) ist bekannt für ihre Kunstwerke und ihre Sauberkeit, trotz der wirtschaftlichen Schwierigkeiten des Landes.",
-            "Die U-Bahn in Lima (Peru) wurde in mehreren Phasen über einen Zeitraum von 30 Jahren gebaut.",
-            "Die U-Bahn in Incheon (Südkorea) ist mit der U-Bahn von Seoul verbunden und bildet eines der größten Metronetze der Welt.",
-            "Die U-Bahn in Palma de Mallorca ist eines der kleinsten Systeme in Europa und bedient hauptsächlich die Universität.",
-            "Die U-Bahn in Rennes (Frankreich) war eine der ersten vollautomatischen Metros der Welt (Typ VAL).",
-            "Die U-Bahn in Lausanne (Schweiz) ist eine der steilsten der Welt und überwindet erhebliche Höhenunterschiede.",
-            "Die U-Bahn in Brescia (Italien) ist wie Kopenhagen und Nürnberg fahrerlos.",
-            "Die U-Bahn in Thessaloniki wurde durch zahlreiche archäologische Funde aus der byzantinischen Zeit stark verzögert.",
-            "Die U-Bahn in Bangalore (Indien), auch 'Namma Metro' genannt, hat spezielle Waggons für Frauen und Kinder.",
-            "Die U-Bahn in Chennai (Indien) hat eine Mischung aus ober- und unterirdischen Strecken.",
-            "Die U-Bahn in Delhi ist eines der am schnellsten wachsenden Netze der Welt und verfügt über einen eigenen Flughafen-Express.",
-            "Die U-Bahn in Schiras (Iran) ist eine der neuesten im Nahen Osten.",
-            "Die U-Bahn in Ankara ist die zweitgrößte in der Türkei nach Istanbul.",
-            "Die U-Bahn in Izmir (Türkei) hat eine Linie, die entlang der Küste verläuft.",
-            "Die U-Bahn in Almaty (Kasachstan) ist bekannt für ihre kunstvollen Stationen, die die kasachische Kultur widerspiegeln.",
-            "Die U-Bahn in Taschkent (Usbekistan) war die erste in Zentralasien und ist für ihre einzigartige Architektur bekannt.",
-            "Die U-Bahn in Minsk (Belarus) hat Stationen, die im sowjetischen Stil dekoriert sind.",
-            "Die U-Bahn in Baku (Aserbaidschan) hat ein kompliziertes Liniensystem, bei dem sich mehrere Linien die gleichen Gleise teilen.",
-            "Die U-Bahn in Dnipro (Ukraine) hat nur eine Linie mit 6 Stationen.",
-            "Die U-Bahn in Catania (Italien) ist eine der kürzesten in Europa und hat oft mit Überschwemmungen durch den nahegelegenen Vulkan Ätna zu kämpfen.",
-            "Die U-Bahn in Genua (Italien) hat eine sehr ungewöhnliche Topographie mit vielen Aufzügen und Schrägaufzügen, um die hügelige Stadt zu erschließen.",
-            "Die U-Bahn in Neapel hat neben der berühmten Toledo-Station viele weitere 'Kunststationen'.",
-            "Die U-Bahn in Turin (Italien) war die erste vollautomatische in Italien.",
-            "Die U-Bahn in Helsinki ist die nördlichste der Welt.",
-            "Die U-Bahn von Maracaibo (Venezuela) ist eigentlich eine Stadtbahn, wird aber als Metro bezeichnet.",
-            "Die U-Bahn von Valencia (Spanien) ist eine Mischung aus U-Bahn und Straßenbahn.",
-            "Die U-Bahn in Chongqing (China) ist einzigartig, da sie durch ein 19-stöckiges Wohnhaus fährt, mit einer eigenen Station im Gebäude."
-        ];
-
-        let factTimeout;
-        function showRandomFact() {
-            if (factTimeout) {
-                clearTimeout(factTimeout);
-            }
-            const fact = subwayFacts[Math.floor(Math.random() * subwayFacts.length)];
-            ui.factDisplay.innerText = fact;
-            ui.factDisplay.classList.remove('hidden');
-
-            factTimeout = setTimeout(() => {
-                ui.factDisplay.classList.add('hidden');
-            }, 15000);
-        }
-
-        // --- Globale Variablen ---
-        // THREE.js Core-Komponenten
-        let scene; // Die Hauptszene, die alle 3D-Objekte enthält.
-        let camera; // Die virtuelle Kamera, durch die der Spieler die Welt sieht.
-        let renderer; // Der WebGL-Renderer, der die Szene auf den Bildschirm zeichnet.
-        let composer; // EffectComposer für Post-Processing (Bloom etc.)
-        let clock; // Eine Uhr zur Messung der Zeit zwischen den Frames (Delta Time).
-        let stats; // Ein (derzeit deaktiviertes) Panel zur Anzeige von Performance-Daten wie FPS.
-        let trackGroup; // Eine THREE.Group, die alle visuellen Elemente der Strecke (Tunnel, Gleise, etc.) zusammenfasst.
-        let dustParticles; // Partikelsystem für Staub
-
-        // Spielwelt-Objekte
-        let ambientLight; // Globales Umgebungslicht
-        let headlight; // Der Scheinwerfer des Zuges
-        let driverCab; // Das 3D-Modell des Cockpits, das an die Kamera angehängt ist.
-        let trackCurve; // Eine THREE.CatmullRomCurve3, die den exakten Verlauf der Strecke definiert.
-        let totalTrackLength = 0; // Die Gesamtlänge der Strecke in Metern.
-
-        // Spieler-Zustand (an `window` gebunden für leichten Zugriff und Speicherung)
-        window.playerDistance = 0; // Die vom Spieler zurückgelegte Distanz auf der Strecke in Metern.
-        window.playerSpeed = 0; // Die aktuelle Geschwindigkeit des Zuges in Metern pro Sekunde.
-
-        // Sound-Variablen
-        let engineSound; // Das Tone.js-Objekt für das Motorgeräusch.
-        let brakeSound; // Das Tone.js-Objekt für das Bremsgeräusch.
-        let wasBrakingLastFrame = false; // Zustand für die Bremsgeräusch-Logik
-        let stationAmbienceSound; // Sound für die Bahnhofs-Atmosphäre
-        let doorOpenSound, doorCloseSound; // Sounds für die Türen
-        let drivingSound, drivingFilter; // Sanftes Fahrgeräusch
-        let audioStarted = false; // Ein Flag, das anzeigt, ob der AudioContext durch eine Benutzerinteraktion gestartet wurde.
-
-        // Steuerungs- und Physikvariablen
-        window.throttle = 0; // Aktueller Schub des Spielers (0.0 bis 1.0). An `window` für einfachen Zugriff gebunden.
-        window.brake = 0; // Aktuelle Bremskraft des Spielers (0.0 bis 1.0). An `window` für einfachen Zugriff gebunden.
-        let doorsOpen = false; // Zustand der Zugtüren (geöffnet/geschlossen).
-        let atStation = false; // Flag, das anzeigt, ob sich der Zug gerade innerhalb der Grenzen einer Station befindet.
-        let currentStation = null; // Das Objekt der aktuellen Station, wenn `atStation` true ist.
-        let previousStation = null; // Speichert die zuletzt besuchte Station, um Logik beim Verlassen auszulösen.
-        let letzteAngesagteStation = null; // Für die Bahnhofsansagen
-        window.credits = 0; // Die Spielwährung des Spielers. An `window` für einfachen Zugriff und Speicherung gebunden.
-        let passengers = 0; // Die aktuelle Anzahl der Passagiere im Zug.
-        let scheduleTime = 0; // Die verbleibende Zeit in Sekunden, um die nächste Station pünktlich zu erreichen.
-        let scheduleTimer = null; // Die `setInterval`-ID für den Fahrplan-Countdown.
-        let isPaused = false; // Zustand des Pausenmenüs.
-
-        // --- Daily Achievements Variablen ---
-        let totalDistanceTraveled = 0; // Kumulative Distanz für Achievements
-        let dailyAchievements = {
-            date: "",
-            list: []
-        };
-
-        // --- Upgrade-System Variablen ---
-        let accelerationLevel = 1; // Das aktuelle Level für die Beschleunigung.
-        let brakingLevel = 1; // Das aktuelle Level für die Bremskraft.
-        let maxSpeedLevel = 1; // Das aktuelle Level für die Höchstgeschwindigkeit.
-        let scoreMultiplierLevel = 1; // Das aktuelle Level für den Einnahme-Multiplikator.
-        let scoreMultiplier = 1.0; // Der aus `scoreMultiplierLevel` berechnete Multiplikator.
-
-        const BASE_MAX_THROTTLE_FORCE = 80000;
-        const BASE_MAX_BRAKE_FORCE = 200000;
-        const BASE_MAX_SPEED = 25; // 90 km/h in m/s
-
-        // --- Physik-Konstanten ---
-        const MASS = 50000; 
-        let MAX_THROTTLE_FORCE = BASE_MAX_THROTTLE_FORCE;
-        let MAX_BRAKE_FORCE = BASE_MAX_BRAKE_FORCE;
-        const FRICTION_COEFFICIENT = 150; 
-        const GRAVITY = 9.81;
-        let MAX_SPEED = BASE_MAX_SPEED;
-
-        // Strecken-Generierung
-        const stations = [];
-        const signals = [];
+        // --- Constants ---
         const NUM_SEGMENTS = 50;
-        const MIN_SEGMENT_LENGTH = 300; 
-        const MAX_SEGMENT_LENGTH = 1000; 
-        const STATION_LENGTH = 200; 
-        const MAX_CURVATURE = 0.001; 
-        const MAX_INCLINE_RATE = 0.0005; 
-        const MAX_GRADE = 0.025; 
-        const TUBE_SEGMENTS = 900;
+        const ACCELERATION = 0.5;
+        const BRAKE_FORCE = 1.5;
+        const FRICTION = 0.1;
+        const MAX_SPEED = 100;
 
-        // Bahnhof-Geometrie Konstanten
-        const STATION_PLATFORM_HEIGHT = 0.5;
-        const STATION_PLATFORM_OFFSET = 4.5;
-        const STATION_PLATFORM_WIDTH = 6.0;
-
-        // DOM-Elemente
-        const ui = {
-            loadingScreen: document.getElementById('loading-screen'),
-            uiContainer: document.getElementById('ui-container'),
-            speedDisplay: document.getElementById('speed-display'),
-            creditsDisplay: document.getElementById('credits-display'),
-            nextStationName: document.getElementById('next-station-name'),
-            nextStationDistance: document.getElementById('next-station-distance'),
-            throttleSlider: document.getElementById('throttle'),
-            throttleValue: document.getElementById('throttle-value'),
-            brakeSlider: document.getElementById('brake'),
-            brakeValue: document.getElementById('brake-value'),
-            doorButton: document.getElementById('door-button'),
-            statusMessage: document.getElementById('status-message'),
-            statsContainer: document.getElementById('stats'),
-            boosterButton: document.getElementById('booster-button'),
-            pauseMenu: document.getElementById('pause-menu'),
-            pauseButton: document.getElementById('pause-button'),
-            resumeButton: document.getElementById('resume-button'),
-            restartButton: document.getElementById('restart-button'),
-            saveButton: document.getElementById('save-button'),
-            loadButton: document.getElementById('load-button'),
-            factDisplay: document.getElementById('fact-display'),
-            passengerDisplay: document.getElementById('passenger-display'),
-            scheduleDisplay: document.getElementById('schedule-display'),
-            scheduleTime: document.getElementById('schedule-time'),
-
-            // Upgrade Menu UI
-            mainPauseMenu: document.getElementById('main-pause-menu'),
-            upgradeMenu: document.getElementById('upgrade-menu'),
-            upgradesButton: document.getElementById('upgrades-button'), // This is now the icon button
-            closeUpgradeMenuButton: document.getElementById('close-upgrade-menu-button'), // New button
-            accelerationLevelDisplay: document.getElementById('acceleration-level'),
-
-            // Achievements Menu UI
-            achievementsButton: document.getElementById('achievements-button'),
-            achievementsMenu: document.getElementById('achievements-menu'),
-            achievementsList: document.getElementById('achievements-list'),
-            closeAchievementsMenuButton: document.getElementById('close-achievements-menu-button'),
-            buyAccelerationButton: document.getElementById('buy-acceleration'),
-            brakingLevelDisplay: document.getElementById('braking-level'),
-            buyBrakingButton: document.getElementById('buy-braking'),
-            maxSpeedLevelDisplay: document.getElementById('max-speed-level'),
-            buyMaxSpeedButton: document.getElementById('buy-max-speed'),
-            scoreMultiplierLevelDisplay: document.getElementById('score-multiplier-level'),
-            buyScoreMultiplierButton: document.getElementById('buy-score-multiplier'),
-        };
-
-        // Materialien für prozedurale Texturen (generiert bei Init)
-        let tunnelMaterial, railMaterial, tieMaterial, cableMaterial, trackbedMaterial;
-        let stationWallMaterial, stationFloorMaterial;
-        let signalMastMaterial, signalLightRedMaterial, signalLightGreenMaterial, signalBoxRedMaterial, signalBoxGreenMaterial;
+        // --- Function Calls ---
+        init();
         
-        // Instanced Meshes für Signale, global zugänglich für Updates
-        let signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh;
-
-        // --- Initialisierung ---
         function init() {
-            // Szene
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x202020);
-            scene.fog = new THREE.Fog(0x202020, 50, 800);
+            scene.fog = new THREE.Fog(0x000000, 1, 800);
 
-            // Uhr
-            clock = new THREE.Clock();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 0);
+            scene.add(camera);
 
-            // Gruppe für alle Strecken-Objekte
-            trackGroup = new THREE.Group();
-            scene.add(trackGroup);
-
-            // Kamera (First-Person)
-            camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
-            
-            // Renderer
-            const container = document.getElementById('canvas-container');
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
-            renderer.shadowMap.enabled = true; // Schatten aktivieren
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Weiche Schatten
-            container.appendChild(renderer.domElement);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
 
-            // --- Post-Processing Setup (Bloom) ---
             const renderScene = new RenderPass(scene, camera);
-
-            // Auflösung, Stärke, Radius, Threshold
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = 0.2; // Ab welcher Helligkeit Bloom wirkt
-            bloomPass.strength = 0.8;  // Wie stark das Leuchten ist
-            bloomPass.radius = 0.5;    // Wie weit das Leuchten streut
+            bloomPass.threshold = 0.21;
+            bloomPass.strength = 1.2;
+            bloomPass.radius = 0.55;
 
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
 
-            // --- Beleuchtung für MeshStandardMaterial ---
-            ambientLight = new THREE.AmbientLight(0xffffff, 0.1); // Ambient stark reduziert für mehr Kontrast
-            scene.add(ambientLight);
+            scene.add(new THREE.AmbientLight(0x404040, 0.2));
+            setupHeadlight();
             
-            // PointLight entfernt/angepasst - wird durch Headlight ersetzt oder als Kabinenlicht genutzt
-            //const cabinLight = new THREE.PointLight(0xffaa00, 0.1, 10, 1);
-            //cabinLight.position.set(0, 1.5, 0);
-            //camera.add(cabinLight); // Licht reist mit der Kamera (Kabine)
+            loadGame(null, true);
+        }
 
-            // --- Scheinwerfer (Headlight) mit Schatten ---
-            headlight = new THREE.SpotLight(0xffffee, 2.0, 2000, Math.PI / 5, 0.3, 1);
-			headlight.position.set(0, 2.0, -1.0);
-			headlight.target.position.set(0, 1.0, -50);
-			headlight.castShadow = true;
-			headlight.shadow.mapSize.width = 1024;
-			headlight.shadow.mapSize.height = 1024;
-			headlight.shadow.bias = -0.00005;
-			headlight.shadow.camera.near = 0.1;
-			headlight.shadow.camera.far = 800; // Wichtig! Muss >= Lichtreichweite sein!
-			camera.add(headlight);
-			camera.add(headlight.target);
+        function loadGame(savedState = null, isInitialLoad = false) {
+            const loadingScreen = document.getElementById('loading-screen');
+            loadingScreen.style.display = 'flex';
             
-            // HemisphereLight reduziert
-            const hemisphereLight = new THREE.HemisphereLight(0x202020, 0x101010, 0.4);
-            scene.add(hemisphereLight);
-            
-            // Cockpit erstellen
-            createDriverCab();
-            camera.add(driverCab); 
-            scene.add(camera);
-
-            // Prozedurale Materialien generieren
-            createProceduralMaterials();
-
-            // Staub-Partikel
-            createDust();
-
-            // Standard-Upgrade-Werte anwenden
-            applyUpgrades();
-            
-            // Daily Achievements initialisieren
-            initializeDailyAchievements();
-
-            // Stats initialisieren und hinzufügen - FPS Counter wird nicht mehr genutzt
-            // stats = new Stats();
-            // stats.domElement.style.position = 'absolute'; 
-            // stats.domElement.style.left = '8px';
-            // stats.domElement.style.top = '8px';
-            // ui.statsContainer.appendChild(stats.dom);
-
-            // Event-Listener
-            window.addEventListener('resize', onWindowResize);
-            setupControls();
-
-            // Audio- und Animationsstart
-            startAudioAndAnimation();
-
-            // Asynchrones Generieren der Strecke
             setTimeout(() => {
-                buildProceduralTrack();
-                ui.loadingScreen.style.display = 'none';
-                ui.uiContainer.classList.remove('hidden');
-            }, 50);
-
-        }
-
-        // --- Audio & Animation Start ---
-        async function startAudioAndAnimation() {
-            // Animation sofort starten, unabhängig vom Audio
-            animate();
-
-            // Versuchen, den Audio-Kontext automatisch zu starten
-            try {
-                if (!audioStarted) {
-                    await Tone.start();
-                    console.log('Audio Context started automatically.');
-                    audioStarted = true;
-                    initAudioNodes();
-                    return; // Erfolg, kein Fallback nötig
-                }
-            } catch (e) {
-                console.warn('Could not start audio context automatically. Waiting for user interaction.');
-            }
-
-            // Fallback: Start bei erster Benutzerinteraktion (Klick/Touch)
-            const startOnInteraction = async () => {
-                if (!audioStarted) {
-                    try {
-                        await Tone.start();
-                        console.log('Audio Context started on user interaction.');
-                        audioStarted = true;
-                        initAudioNodes();
-                        // Listener nach Erfolg entfernen
-                        document.body.removeEventListener('mousedown', startOnInteraction);
-                        document.body.removeEventListener('touchstart', startOnInteraction);
-                    } catch (err) {
-                        console.error('Failed to start audio on interaction:', err);
+                if (scene.children.includes(trackGroup)) {
+                    // Dispose and remove old track
+                     while(trackGroup.children.length > 0){
+                        const object = trackGroup.children[0];
+                        if(object.geometry) object.geometry.dispose();
+                        if(object.material) {
+                            if(Array.isArray(object.material)) object.material.forEach(m=>m.dispose())
+                            else object.material.dispose();
+                        }
+                        if(object.dispose) object.dispose(); // For instanced meshes
+                        trackGroup.remove(object);
                     }
+                    scene.remove(trackGroup);
                 }
-            };
+                trackGroup = new THREE.Group();
+                scene.add(trackGroup);
+                stations = [];
+                signals = [];
+                switchInfo = null;
+                branchCurve = null;
 
-            document.body.addEventListener('mousedown', startOnInteraction);
-            document.body.addEventListener('touchstart', startOnInteraction);
-        }
-
-        // --- Audio Nodes Initialisierung ---
-        function initAudioNodes() {
-            // Engine Sound (Beschleunigung)
-            engineSound = new Tone.Oscillator({
-                frequency: 100, 
-                type: "sine", 
-                volume: -Infinity // Startet komplett leise
-            }).toDestination();
-
-            // Brake Sound (Bremsen)
-            brakeSound = new Tone.NoiseSynth({
-                noise: {
-                    type: "pink" 
-                },
-                envelope: {
-                    attack: 0.01,
-                    decay: 0.1,
-                    sustain: 0.8,
-                    release: 0.2
-                },
-                volume: -Infinity 
-            }).toDestination();
-
-            // Station Ambience (murmur)
-            const autoFilter = new Tone.AutoFilter({
-                frequency: "4n",
-                baseFrequency: 400,
-                octaves: 2
-            }).toDestination();
-
-            stationAmbienceSound = new Tone.Noise({
-                type: "brown",
-                volume: -Infinity,
-            }).connect(autoFilter).start();
-
-            // --- Komplexer 3-Sekunden Tür-Öffnen-Sound ---
-            const doorOpenHiss = new Tone.NoiseSynth({
-                noise: { type: 'white' },
-                envelope: { attack: 0.01, decay: 0.1, sustain: 0.1 },
-            }).toDestination();
-            doorOpenHiss.volume.value = -15;
-
-            const doorOpenFilter = new Tone.Filter(800, "bandpass").toDestination();
-            const doorOpenNoise = new Tone.Noise('brown').connect(doorOpenFilter);
-            doorOpenNoise.volume.value = -25;
-
-            // Definiere eine Funktion, die den Sound abspielt
-            const startDoorOpenSound = () => {
-                const now = Tone.now();
-                // 1. Kurzes Zischen am Anfang
-                doorOpenHiss.triggerAttackRelease(0.1, now);
-
-                // 2. Schiebgeräusch
-                doorOpenNoise.start(now + 0.1);
-                doorOpenFilter.frequency.rampTo(1500, 2.8, now + 0.1);
-
-                // 3. Nach 3 Sekunden stoppen
-                doorOpenNoise.stop(now + 2.9);
-            };
-
-            // Weise die Start-Funktion der globalen Variable zu
-            doorOpenSound = { start: startDoorOpenSound };
-
-            // --- Komplexer 3-Sekunden Tür-Schließen-Sound ---
-            const doorCloseFilter = new Tone.Filter(1500, "bandpass").toDestination();
-            const doorCloseNoise = new Tone.Noise('brown').connect(doorCloseFilter);
-            doorCloseNoise.volume.value = -25;
-
-            const doorThud = new Tone.MembraneSynth({
-                pitchDecay: 0.08,
-                octaves: 2,
-                oscillator: { type: 'sine' },
-                envelope: { attack: 0.01, decay: 0.2, sustain: 0.01, release: 0.1 },
-                volume: -5
-            }).toDestination();
-
-            const doorLockClick = new Tone.MetalSynth({
-                frequency: 400,
-                envelope: { attack: 0.001, decay: 0.05, release: 0.05 },
-                harmonicity: 8.5,
-                modulationIndex: 40,
-                resonance: 3000,
-                octaves: 1.5,
-                volume: -10
-            }).toDestination();
-
-            const startDoorCloseSound = () => {
-                const now = Tone.now();
-                // 1. Schiebgeräusch
-                doorCloseNoise.start(now);
-                doorCloseFilter.frequency.rampTo(800, 2.8, now);
-
-                // 2. Dumpfer Aufprall am Ende
-                doorThud.triggerAttack("C1", now + 2.8);
-
-                // 3. Klick des Schlosses
-                doorLockClick.triggerAttack(now + 2.9);
-
-                // 4. Stoppen des Schiebgeräuschs
-                doorCloseNoise.stop(now + 3.0);
-            };
-
-            doorCloseSound = { start: startDoorCloseSound };
-
-            // --- Sanftes Fahrgeräusch ---
-            drivingFilter = new Tone.Filter({
-                type: 'lowpass',
-                frequency: 400,
-                Q: 2
-            }).toDestination();
-
-            drivingSound = new Tone.Noise({
-                type: 'brown',
-                volume: -Infinity
-            }).connect(drivingFilter).start();
-
-
-            Tone.Transport.start();
-        }
-
-        // --- Prozedurale Materialerzeugung ---
-        function createProceduralMaterials() {
-             // Tunnel Material
-            const { texture: brickTexture, normalTexture: brickNormal } = generateBrickTexture(256, 256);
-            brickTexture.wrapS = THREE.RepeatWrapping;
-            brickTexture.wrapT = THREE.RepeatWrapping;
-            brickNormal.wrapS = THREE.RepeatWrapping;
-            brickNormal.wrapT = THREE.RepeatWrapping;
-
-            // Die Wiederholung in Y-Richtung (Umfang) wird auf 40 gesetzt für eine realistischere Ziegelhöhe.
-            // Die X-Wiederholung (Länge) wird nach der Streckengenerierung basierend auf der echten Länge berechnet.
-            brickTexture.repeat.set(1, 40);
-            brickNormal.repeat.set(1, 40);
-
-            tunnelMaterial = new THREE.MeshStandardMaterial({ 
-                map: brickTexture,
-                normalMap: brickNormal,
-                normalScale: new THREE.Vector2(1, 1),
-                side: THREE.BackSide, 
-                roughness: 0.9,
-                metalness: 0.05
-            });
-
-            // Schienen Material
-            railMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x666666, 
-                roughness: 0.7, 
-                metalness: 0.9 
-            }); 
-            
-            // Schwellen Material
-            tieMaterial = new THREE.MeshStandardMaterial({
-                color: 0x4a2a0a,
-                roughness: 0.9
-            });
-
-            // Kabel Material
-            cableMaterial = new THREE.MeshStandardMaterial({
-                color: 0x111111,
-                roughness: 0.4,
-                metalness: 0.1
-            });
-
-            // Bahnhof Materialien
-            const { texture: stationWallTexture, normalTexture: stationWallNormal } = generateNoiseTexture(512, 128, {
-                scale: 12,
-                octaves: 2,
-                persistence: 0.5,
-                lacunarity: 2.0,
-                color1: 0xaaaaaa,
-                color2: 0x888888
-            });
-            stationWallTexture.wrapS = THREE.RepeatWrapping;
-            stationWallTexture.wrapT = THREE.RepeatWrapping;
-            stationWallNormal.wrapS = THREE.RepeatWrapping;
-            stationWallNormal.wrapT = THREE.RepeatWrapping;
-
-            stationWallMaterial = new THREE.MeshStandardMaterial({ 
-                map: stationWallTexture,
-                normalMap: stationWallNormal,
-                roughness: 0.7,
-                metalness: 0.1
-            });
-            
-            const { texture: stationFloorTexture, normalTexture: stationFloorNormal } = generateNoiseTexture(256, 256, {
-                scale: 50,
-                octaves: 3,
-                persistence: 0.4,
-                lacunarity: 2.2,
-                color1: 0xcccccc,
-                color2: 0x999999
-            });
-            stationFloorTexture.wrapS = THREE.RepeatWrapping;
-            stationFloorTexture.wrapT = THREE.RepeatWrapping;
-            stationFloorNormal.wrapS = THREE.RepeatWrapping;
-            stationFloorNormal.wrapT = THREE.RepeatWrapping;
-
-            stationFloorMaterial = new THREE.MeshStandardMaterial({ 
-                map: stationFloorTexture,
-                normalMap: stationFloorNormal,
-                roughness: 0.6,
-                metalness: 0.05
-            });
-
-            // Signal Materialien
-            signalMastMaterial = new THREE.MeshStandardMaterial({
-                color: 0x555555,
-                roughness: 0.8,
-                metalness: 0.2
-            });
-            signalLightRedMaterial = new THREE.MeshStandardMaterial({
-                color: 0xff0000,
-                emissive: 0xff0000,
-                emissiveIntensity: 1
-            });
-            signalLightGreenMaterial = new THREE.MeshStandardMaterial({
-                color: 0x00ff00,
-                emissive: 0x00ff00,
-                emissiveIntensity: 1
-            });
-            signalBoxRedMaterial = new THREE.MeshStandardMaterial({
-                color: 0x880000, // Dunkelrot
-                roughness: 0.6,
-                metalness: 0.1
-            });
-            signalBoxGreenMaterial = new THREE.MeshStandardMaterial({
-                color: 0x008800, // Dunkelgrün
-                roughness: 0.6,
-                metalness: 0.1
-            });
-
-            // Gleisbett (Beton) Material
-            const { texture: trackbedTexture, normalTexture: trackbedNormal } = generateNoiseTexture(256, 256, {
-                scale: 80,
-                octaves: 2,
-                persistence: 0.3,
-                lacunarity: 2.5,
-                color1: 0x888888,
-                color2: 0x666666
-            });
-            trackbedTexture.wrapS = THREE.RepeatWrapping;
-            trackbedTexture.wrapT = THREE.RepeatWrapping;
-            trackbedNormal.wrapS = THREE.RepeatWrapping;
-            trackbedNormal.wrapT = THREE.RepeatWrapping;
-
-            trackbedMaterial = new THREE.MeshStandardMaterial({
-                map: trackbedTexture,
-                normalMap: trackbedNormal,
-                roughness: 0.85,
-                metalness: 0.0
-            });
-        }
-
-
-        // --- Strecken-Generierung ---
-        function buildProceduralTrack() {
-            const points = [];
-            let currentPos = new THREE.Vector3(0, 0, 0); 
-            let currentDir = new THREE.Vector3(0, 0, -1); 
-            
-            let currentCurvature = 0;
-            let currentInclineRate = 0; 
-            totalTrackLength = 0;
-
-            const up = new THREE.Vector3(0, 1, 0);
-            const tempVec = new THREE.Vector3();
-            const tempQuat = new THREE.Quaternion();
-
-            // --- 1. Feste 50m-Strecke bis zur ersten Station ---
-            let segmentLength = 50;
-            let targetCurvature = 0; 
-            let targetInclineRate = 0; 
-            
-            for (let m = 0; m < segmentLength; m++) {
-                currentCurvature += (targetCurvature - currentCurvature) * 0.05;
-                currentInclineRate += (targetInclineRate - currentInclineRate) * 0.05;
-                
-                // Apply curvature rotation
-                tempQuat.setFromAxisAngle(up, currentCurvature);
-                currentDir.applyQuaternion(tempQuat);
-                
-                // Apply incline rotation
-                tempVec.crossVectors(currentDir, up).normalize(); 
-                tempQuat.setFromAxisAngle(tempVec, currentInclineRate);
-                currentDir.applyQuaternion(tempQuat);
-
-                // Clamp the resulting incline (tangent.y)
-                if (Math.abs(currentDir.y) > MAX_GRADE) {
-                    currentDir.y = Math.sign(currentDir.y) * MAX_GRADE;
-                    currentDir.normalize(); 
-                }
-                
-                currentPos.add(currentDir);
-                points.push(currentPos.clone());
-                totalTrackLength++;
-            }
-
-            // --- 2. Erste Station (200m) erzwingen ---
-            segmentLength = STATION_LENGTH; 
-            targetCurvature = 0; 
-            targetInclineRate = 0;   
-            
-            stations.push({
-                name: generateFunnyStationName(),
-                distance: totalTrackLength + segmentLength / 2, 
-                length: segmentLength,
-                visited: false,
-                passengersExchanged: false
-            });
-
-            for (let m = 0; m < segmentLength; m++) {
-                currentCurvature += (targetCurvature - currentCurvature) * 0.05;
-                currentInclineRate += (targetInclineRate - currentInclineRate) * 0.05;
-
-                // Apply curvature rotation
-                tempQuat.setFromAxisAngle(up, currentCurvature);
-                currentDir.applyQuaternion(tempQuat);
-                
-                // Apply incline rotation
-                tempVec.crossVectors(currentDir, up).normalize(); 
-                tempQuat.setFromAxisAngle(tempVec, currentInclineRate);
-                currentDir.applyQuaternion(tempQuat);
-
-                // Clamp the resulting incline (tangent.y)
-                if (Math.abs(currentDir.y) > MAX_GRADE) {
-                    currentDir.y = Math.sign(currentDir.y) * MAX_GRADE;
-                    currentDir.normalize(); 
-                }
-                
-                currentPos.add(currentDir);
-                points.push(currentPos.clone());
-                totalTrackLength++;
-            }
-            
-            let lastWasStation = true; 
-            let nextSignalDistance = 1000 + Math.random() * 1000;
-
-            // --- 3. Restliche Strecke prozedural generieren ---
-            for (let i = 1; i < NUM_SEGMENTS; i++) { 
-                const isStation = Math.random() < 0.2 && !lastWasStation; 
-                
-                if (isStation) {
-                    segmentLength = STATION_LENGTH;
-                    targetCurvature = 0; 
-                    targetInclineRate = 0;   
-                    stations.push({
-                        name: generateFunnyStationName(),
-                        distance: totalTrackLength + segmentLength / 2,
-                        length: segmentLength,
-                        visited: false,
-                        passengersExchanged: false
-                    });
-                    lastWasStation = true;
+                if (savedState) {
+                    window.playerDistance = savedState.playerDistance;
+                    window.playerSpeed = savedState.playerSpeed;
+                    window.throttle = savedState.throttle;
+                    window.brake = savedState.brake;
+                    window.score = savedState.score;
+                    const points = savedState.trackPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
+                    trackCurve = new THREE.CatmullRomCurve3(points, true);
                 } else {
-                    segmentLength = MIN_SEGMENT_LENGTH + Math.random() * (MAX_SEGMENT_LENGTH - MIN_SEGMENT_LENGTH);
-                    targetCurvature = (Math.random() - 0.5) * 2 * MAX_CURVATURE;
-                    targetInclineRate = (Math.random() - 0.5) * 2 * MAX_INCLINE_RATE; 
-                    lastWasStation = false;
+                    window.playerDistance = 0;
+                    window.playerSpeed = 0;
+                    window.throttle = 0;
+                    window.brake = 0;
+                    window.score = 0;
+                    trackCurve = createTrackCurve(NUM_SEGMENTS);
                 }
-
-                // Punkte für dieses Segment generieren (1 Punkt pro Meter)
-                for (let m = 0; m < segmentLength; m++) {
-                    // Sanfter Übergang zu neuer Krümmung/Steigung
-                    currentCurvature += (targetCurvature - currentCurvature) * 0.05;
-                    currentInclineRate += (targetInclineRate - currentInclineRate) * 0.05;
-
-                    // Apply curvature rotation
-                    tempQuat.setFromAxisAngle(up, currentCurvature);
-                    currentDir.applyQuaternion(tempQuat);
-
-                    // Apply incline rotation
-                    tempVec.crossVectors(currentDir, up).normalize(); 
-                    tempQuat.setFromAxisAngle(tempVec, currentInclineRate);
-                    currentDir.applyQuaternion(tempQuat);
-                    
-                    // Clamp the resulting incline (tangent.y)
-                    if (Math.abs(currentDir.y) > MAX_GRADE) {
-                        currentDir.y = Math.sign(currentDir.y) * MAX_GRADE;
-                        currentDir.normalize(); 
-                    }
-                    
-                    currentPos.add(currentDir);
-                    points.push(currentPos.clone());
-                    totalTrackLength++;
-
-                    // --- Signal Platzierung ---
-                    if (totalTrackLength >= nextSignalDistance) {
-                        let inStation = false;
-                        for (const station of stations) {
-                            if (totalTrackLength > station.distance - station.length / 2 &&
-                                totalTrackLength < station.distance + station.length / 2) {
-                                inStation = true;
-                                break;
-                            }
-                        }
-
-                        if (!inStation && totalTrackLength > 100) {
-                            const color = Math.random() < 0.5 ? 'red' : 'green';
-                            signals.push({
-                                distance: totalTrackLength,
-                                color: color,
-                                pointsAwarded: false
-                            });
-                            nextSignalDistance = totalTrackLength + 1000 + Math.random() * 1000;
-                        }
-                    }
-                }
-            }
-
-
-            trackCurve = new THREE.CatmullRomCurve3(points);
-            trackCurve.curveType = 'catmullrom';
-            trackCurve.tension = 0.5;
-
-            // Geometrie für die Strecke erstellen
-            createTrackGeometry(trackCurve);
-            
-            // Bahnhöfe erstellen
-            createStations(trackCurve);
-
-            // Signale erstellen
-            createSignals(trackCurve);
-
-            // Passe die Wiederholung der Ziegeltextur an die tatsächliche Streckenlänge an
-            const tunnelCircumference = 2 * Math.PI * 5.0; // tunnelRadius = 5.0
-            const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
-            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Assume square bricks for now
-            tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
-            tunnelMaterial.normalMap.repeat.x = totalTrackLength / physicalWidthOfOneRepeat; // Auch NormalMap anpassen!
-            tunnelMaterial.map.needsUpdate = true;
-            tunnelMaterial.normalMap.needsUpdate = true;
-        }
-
-        // --- Strecken-Geometrie ---
-        function createTrackGeometry(curve) {
-            
-            const tunnelPoints = [];
-            const railPointsLeft = [];
-            const railPointsRight = [];
-            
-            const tunnelOffsetY = 4.5; 
-            const tunnelRadius = 5.0; 
-            const railOffset = 1.0; 
-            const railHeight = 0.1; 
-            
-            const up = new THREE.Vector3(0, 1, 0);
-            const tangent = new THREE.Vector3();
-            const binormal = new THREE.Vector3();
-            const normal = new THREE.Vector3();
-            const pos = new THREE.Vector3();
-
-            const numRailPoints = Math.floor(totalTrackLength); 
-            
-            for (let i = 0; i < numRailPoints; i++) {
-                const t = i / numRailPoints;
-                curve.getPointAt(t, pos);
-                curve.getTangentAt(t, tangent);
                 
-                // Berechne lokale Achsen
-                binormal.crossVectors(up, tangent).normalize(); 
-                normal.crossVectors(tangent, binormal).normalize(); 
+                totalTrackLength = trackCurve.getLength();
                 
-                // 1. Schienenpositionen (relativ zu y=0)
-                const posLeft = pos.clone().add(binormal.clone().multiplyScalar(railOffset)).add(normal.clone().multiplyScalar(railHeight));
-                const posRight = pos.clone().add(binormal.clone().multiplyScalar(-railOffset)).add(normal.clone().multiplyScalar(railHeight));
-                railPointsLeft.push(posLeft);
-                railPointsRight.push(posRight);
-
-                // 2. Tunnel-Mittelpunkt-Position (angehoben)
-                const tunnelCenterPos = pos.clone().add(normal.clone().multiplyScalar(tunnelOffsetY));
-                tunnelPoints.push(tunnelCenterPos);
-            }
-
-            // 1. Der Tunnel
-            const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
-            const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 32, false);
-            const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
-            tunnelMesh.receiveShadow = true; // Schatten empfangen
-            trackGroup.add(tunnelMesh);
-
-            // Tunnelbögen hinzufügen
-            createTunnelArches(curve, tunnelOffsetY);
-
-            // Tunneldetails (Kabel, Rohre) hinzufügen
-            createTunnelDetails(curve, tunnelOffsetY);
-
-            // Tunnelbeleuchtung hinzufügen
-            createTunnelLights(curve, tunnelOffsetY);
-
-            // 2. Schienen
-            const railCurveLeft = new THREE.CatmullRomCurve3(railPointsLeft);
-            const railCurveRight = new THREE.CatmullRomCurve3(railPointsRight);
-
-            const railGeo = new THREE.TubeGeometry(railCurveLeft, TUBE_SEGMENTS, 0.1, 4, false);
-            const railMeshLeft = new THREE.Mesh(railGeo, railMaterial);
-            const railMeshRight = new THREE.Mesh(railGeo.clone().copy(new THREE.TubeGeometry(railCurveRight, TUBE_SEGMENTS, 0.1, 4, false)), railMaterial);
-            
-            trackGroup.add(railMeshLeft);
-            trackGroup.add(railMeshRight);
-
-
-            // 4. Schwellen
-            const tieGeo = new THREE.BoxGeometry(2.5, 0.15, 0.3);
-            const tieCount = Math.floor(totalTrackLength / 1.5);
-            const tieMesh = new THREE.InstancedMesh(tieGeo, tieMaterial, tieCount);
-            tieMesh.receiveShadow = true; // Schatten empfangen
-            tieMesh.castShadow = false; // Performance Optimierung
-
-            const dummy = new THREE.Object3D();
-            const lookAtPos = new THREE.Vector3();
-
-            for (let i = 0; i < tieCount; i++) {
-                const t = (i / tieCount);
-                const t_next = (i + 1) / tieCount;
-
-                curve.getPointAt(t, dummy.position);
-                curve.getPointAt(t_next, lookAtPos);
-
-                // Schwellen sind bei y=0 zentriert (halbe Dicke nach unten)
-                dummy.position.y -= 0.075;
-
-                dummy.lookAt(lookAtPos);
-
-                dummy.updateMatrix();
-                tieMesh.setMatrixAt(i, dummy.matrix);
-            }
-            tieMesh.instanceMatrix.needsUpdate = true;
-            trackGroup.add(tieMesh);
-
-            // 5. Gleisbett
-            const trackbedGeo = new THREE.BoxGeometry(3.0, 0.2, 1.5);
-            const trackbedMesh = new THREE.InstancedMesh(trackbedGeo, trackbedMaterial, tieCount); // Gleiche Anzahl wie Schwellen
-            trackbedMesh.receiveShadow = true; // Schatten empfangen
-
-            for (let i = 0; i < tieCount; i++) {
-                const t = (i / tieCount);
-                const t_next = (i + 1) / tieCount;
-
-                curve.getPointAt(t, dummy.position);
-                curve.getPointAt(t_next, lookAtPos);
-
-                // Gleisbett liegt unter den Schwellen
-                dummy.position.y -= 0.25;
-
-                dummy.lookAt(lookAtPos);
-                dummy.updateMatrix();
-                trackbedMesh.setMatrixAt(i, dummy.matrix);
-            }
-            trackbedMesh.instanceMatrix.needsUpdate = true;
-            trackGroup.add(trackbedMesh);
-        }
-
-        function createTunnelLights(curve, tunnelOffsetY) {
-            const lightSpacing = 100;
-            const lightColor = 0xffaa00; // Warm/Orangeish
-
-            // Geometry for the lamp fixture
-            const lampGeo = new THREE.BoxGeometry(0.5, 0.2, 0.2);
-            const lampMat = new THREE.MeshStandardMaterial({ color: 0x888888, emissive: lightColor, emissiveIntensity: 25.0 });
-
-            // Count how many lights
-            const lightCount = Math.floor(totalTrackLength / lightSpacing);
-            const lampMesh = new THREE.InstancedMesh(lampGeo, lampMat, lightCount);
-            lampMesh.castShadow = false;
-            lampMesh.receiveShadow = false;
-
-            const dummy = new THREE.Object3D();
-            const pos = new THREE.Vector3();
-            const tangent = new THREE.Vector3();
-            const up = new THREE.Vector3(0, 1, 0);
-            const binormal = new THREE.Vector3();
-            const normal = new THREE.Vector3();
-
-            let lightIndex = 0;
-
-            for (let i = 0; i < lightCount; i++) {
-                const distance = i * lightSpacing;
-
-                // Check if in station
-                 let inStation = false;
-                for (const station of stations) {
-                    if (distance > station.distance - station.length / 2 && distance < station.distance + station.length / 2) {
-                        inStation = true;
-                        break;
-                    }
-                }
-                if (inStation) continue;
-
-                const t = distance / totalTrackLength;
-                curve.getPointAt(t, pos);
-                curve.getTangentAt(t, tangent);
-
-                binormal.crossVectors(up, tangent).normalize();
-                normal.crossVectors(tangent, binormal).normalize();
-
-                // Position: Top of the tunnel
-                // The tunnel center is at pos + normal * tunnelOffsetY
-                const ceilingPos = pos.clone().addScaledVector(normal, tunnelOffsetY + 4.5); // A bit below the max radius
-
-                dummy.position.copy(ceilingPos);
-                dummy.up.copy(normal);
-                dummy.lookAt(ceilingPos.clone().add(tangent));
-                dummy.updateMatrix();
-
-                lampMesh.setMatrixAt(lightIndex, dummy.matrix);
-
-                lightIndex++;
-            }
-
-            lampMesh.count = lightIndex;
-            lampMesh.instanceMatrix.needsUpdate = true;
-            trackGroup.add(lampMesh);
-        }
-
-        function createTunnelArches(curve, tunnelOffsetY) {
-            const archSpacing = 50; // Alle 50 Meter ein Bogen
-            const archRadius = 5.2; // Etwas größer als der Tunnelradius
-            const archTubeRadius = 0.15;
-            const archColor = 0xFFD700; // Goldgelb für einen warmen Leuchteffekt
-
-            const archGeo = new THREE.TorusGeometry(archRadius, archTubeRadius, 8, 32);
-            const archMat = new THREE.MeshBasicMaterial({ color: archColor });
-
-            const archCount = Math.floor(totalTrackLength / archSpacing);
-            const archMesh = new THREE.InstancedMesh(archGeo, archMat, archCount);
-            archMesh.castShadow = false; // Performance Optimierung
-            archMesh.receiveShadow = true;
-
-            const dummy = new THREE.Object3D();
-            const pos = new THREE.Vector3();
-            const tangent = new THREE.Vector3();
-            const up = new THREE.Vector3(0, 1, 0);
-            const binormal = new THREE.Vector3();
-            const normal = new THREE.Vector3();
-
-            let archIndex = 0;
-            for (let i = 0; i < archCount; i++) {
-                const distance = i * archSpacing;
-
-                // Prüfen, ob der Bogen in einer Station wäre
-                let inStation = false;
-                for (const station of stations) {
-                    if (distance > station.distance - station.length / 2 && distance < station.distance + station.length / 2) {
-                        inStation = true;
-                        break;
-                    }
-                }
-                if (inStation) continue;
-
-                const t = distance / totalTrackLength;
-                curve.getPointAt(t, pos);
-                curve.getTangentAt(t, tangent);
-
-                // Berechne lokale Achsen
-                binormal.crossVectors(up, tangent).normalize();
-                normal.crossVectors(tangent, binormal).normalize();
-
-                // Position des Bogens (im Zentrum des Tunnels)
-                dummy.position.copy(pos).addScaledVector(normal, tunnelOffsetY);
-
-                // Ausrichtung des Bogens
-                const lookAtPos = dummy.position.clone().add(tangent);
-                dummy.up.copy(normal);
-                dummy.lookAt(lookAtPos);
-
-                dummy.updateMatrix();
-                archMesh.setMatrixAt(archIndex, dummy.matrix);
-                archIndex++;
-            }
-            archMesh.count = archIndex; // Wichtig, falls Bögen übersprungen wurden
-            archMesh.instanceMatrix.needsUpdate = true;
-            trackGroup.add(archMesh);
-        }
-
-        function createTunnelDetails(curve, tunnelOffsetY) {
-            const cableSpacing = 50;
-            const cableCount = Math.floor(totalTrackLength / cableSpacing);
-
-            const cableGeo1 = new THREE.CylinderGeometry(0.1, 0.1, 3, 6);
-            const cableGeo2 = new THREE.CylinderGeometry(0.05, 0.05, 3, 6);
-
-            const cableMesh1 = new THREE.InstancedMesh(cableGeo1, cableMaterial, cableCount);
-            const cableMesh2 = new THREE.InstancedMesh(cableGeo2, cableMaterial, cableCount);
-            const cableMesh3 = new THREE.InstancedMesh(cableGeo2, cableMaterial, cableCount);
-
-            cableMesh1.castShadow = false; // Performance Optimierung
-            cableMesh2.castShadow = false;
-            cableMesh3.castShadow = false;
-
-            const dummy = new THREE.Object3D();
-            const pos = new THREE.Vector3();
-            const tangent = new THREE.Vector3();
-            const up = new THREE.Vector3(0, 1, 0);
-            const binormal = new THREE.Vector3();
-            const normal = new THREE.Vector3();
-
-            for (let i = 0; i < cableCount; i++) {
-                const distance = i * cableSpacing;
-                const t = distance / totalTrackLength;
-
-                curve.getPointAt(t, pos);
-                curve.getTangentAt(t, tangent);
-
-                binormal.crossVectors(up, tangent).normalize();
-                normal.crossVectors(tangent, binormal).normalize();
-
-                const lookAtPos = pos.clone().add(tangent);
-
-                // --- Linke Seite ---
-                // Kabelbündel 1 (dick)
-                let cablePos = pos.clone().addScaledVector(normal, 3.5).addScaledVector(binormal, -4.8);
-                dummy.position.copy(cablePos);
-                dummy.up.copy(tangent);
-                dummy.lookAt(lookAtPos);
-                dummy.updateMatrix();
-                cableMesh1.setMatrixAt(i, dummy.matrix);
-
-                // Kabelbündel 2 (dünn)
-                cablePos = pos.clone().addScaledVector(normal, 4.0).addScaledVector(binormal, -4.9);
-                dummy.position.copy(cablePos);
-                dummy.up.copy(tangent);
-                dummy.lookAt(lookAtPos);
-                dummy.updateMatrix();
-                cableMesh2.setMatrixAt(i, dummy.matrix);
-
-                // --- Rechte Seite ---
-                 // Kabelbündel 3 (dünn)
-                cablePos = pos.clone().addScaledVector(normal, 3.8).addScaledVector(binormal, 4.85);
-                dummy.position.copy(cablePos);
-                dummy.up.copy(tangent);
-                dummy.lookAt(lookAtPos);
-                dummy.updateMatrix();
-                cableMesh3.setMatrixAt(i, dummy.matrix);
-            }
-
-            cableMesh1.instanceMatrix.needsUpdate = true;
-            cableMesh2.instanceMatrix.needsUpdate = true;
-            cableMesh3.instanceMatrix.needsUpdate = true;
-            trackGroup.add(cableMesh1, cableMesh2, cableMesh3);
-        }
-
-        // --- Bahnhöfe ---
-        function createStations(curve) {
-            const stationWallHeight = 3.0; 
-
-            const up = new THREE.Vector3(0, 1, 0);
-            const binormal = new THREE.Vector3();
-            const tangent = new THREE.Vector3();
-            const pos = new THREE.Vector3();
-            
-            stations.forEach(station => {
-                station.people = []; // Array to hold animation data for each person
-
-                const t = station.distance / totalTrackLength;
-                curve.getPointAt(t, pos);
-                curve.getTangentAt(t, tangent);
-                binormal.crossVectors(up, tangent).normalize();
+                const { tunnel, ties } = createTrackGeometry(trackCurve, totalTrackLength);
+                trackGroup.add(tunnel);
+                trackGroup.add(ties);
                 
-                const stationGroup = new THREE.Group();
-                stationGroup.position.copy(pos);
-                stationGroup.lookAt(pos.clone().add(tangent)); 
-                trackGroup.add(stationGroup);
-
-                // 1. Plattform
-                const platformGeo = new THREE.BoxGeometry(STATION_PLATFORM_WIDTH, 0.5, station.length);
-                const platformMeshLeft = new THREE.Mesh(platformGeo, stationFloorMaterial);
-                platformMeshLeft.position.set(STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT - 0.25, 0);
-                platformMeshLeft.receiveShadow = true;
-                platformMeshLeft.castShadow = true;
-                stationGroup.add(platformMeshLeft);
-
-                const platformMeshRight = new THREE.Mesh(platformGeo, stationFloorMaterial);
-                platformMeshRight.position.set(-STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT - 0.25, 0);
-                platformMeshRight.receiveShadow = true;
-                platformMeshRight.castShadow = true;
-                stationGroup.add(platformMeshRight);
-
-                // 2. Wände (außen zur Tunnelwand)
-                const wallThickness = 0.5;
-                const wallGeo = new THREE.BoxGeometry(wallThickness, stationWallHeight, station.length); 
-                const wallMeshLeft = new THREE.Mesh(wallGeo, stationWallMaterial);
-                wallMeshLeft.position.set(STATION_PLATFORM_OFFSET + STATION_PLATFORM_WIDTH / 2 + wallThickness / 2, STATION_PLATFORM_HEIGHT + (stationWallHeight / 2) - 0.5, 0);
-                wallMeshLeft.receiveShadow = true;
-                wallMeshLeft.castShadow = true;
-                stationGroup.add(wallMeshLeft);
-
-                const wallMeshRight = new THREE.Mesh(wallGeo, stationWallMaterial);
-                wallMeshRight.position.set(-(STATION_PLATFORM_OFFSET + STATION_PLATFORM_WIDTH / 2 + wallThickness / 2), STATION_PLATFORM_HEIGHT + (stationWallHeight / 2) - 0.5, 0);
-                wallMeshRight.receiveShadow = true;
-                wallMeshRight.castShadow = true;
-                stationGroup.add(wallMeshRight);
-
-                // 3. Decke - ENTFERNT
-
-                // 4. Bahnhofsname (TextMesh) 
-                const canvas = document.createElement('canvas');
-                canvas.width = 512;
-                canvas.height = 128;
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = 'black';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.font = 'Bold 60px Arial';
-                ctx.fillStyle = 'white';
-                ctx.textAlign = 'center';
-                ctx.fillText(station.name.toUpperCase(), canvas.width / 2, canvas.height / 2 + 20);
-                const textTexture = new THREE.CanvasTexture(canvas);
-                const textMaterial = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true });
-                const textPlane = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.5), textMaterial); 
-                textPlane.position.set(STATION_PLATFORM_OFFSET + STATION_PLATFORM_WIDTH / 2 + wallThickness / 2 - 0.01, STATION_PLATFORM_HEIGHT + 1.0, 0);
-                textPlane.rotation.y = -Math.PI / 2; 
-                stationGroup.add(textPlane);
+                createStations();
+                createSignals();
                 
-                const textPlaneRight = textPlane.clone();
-                textPlaneRight.position.set(-(STATION_PLATFORM_OFFSET + STATION_PLATFORM_WIDTH / 2 + wallThickness / 2 - 0.01), STATION_PLATFORM_HEIGHT + 1.0, 0);
-                textPlaneRight.rotation.y = Math.PI / 2; 
-                stationGroup.add(textPlaneRight);
-
-
-                // 5. Bahnhofsbeleuchtung
-                const stationLight1 = new THREE.PointLight(0xffffee, 0.2, 120, 2);
-                stationLight1.position.set(STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, -station.length / 4);
-                stationLight1.isStationLight = true; 
-                stationGroup.add(stationLight1);
-
-                const stationLight2 = stationLight1.clone();
-                stationLight2.position.set(STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, station.length / 4);
-                stationLight2.isStationLight = true;
-                stationGroup.add(stationLight2);
+                updatePlayerPosition();
                 
-                const stationLight3 = stationLight1.clone();
-                stationLight3.position.set(-STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, -station.length / 4);
-                stationLight3.isStationLight = true;
-                stationGroup.add(stationLight3);
+                loadingScreen.style.display = 'none';
 
-                const stationLight4 = stationLight1.clone();
-                stationLight4.position.set(-STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, station.length / 4);
-                stationLight4.isStationLight = true;
-                stationGroup.add(stationLight4);
-
-                // --- Personen hinzufügen (Optimiert mit InstancedMesh) ---
-                const numPeoplePerSide = Math.floor(Math.random() * 6) + 3;
-                const totalPeople = numPeoplePerSide * 2;
-
-                // Geometrien einmal erstellen
-                const headGeo = new THREE.SphereGeometry(0.18, 16, 12);
-                const torsoGeo = new THREE.CylinderGeometry(0.2, 0.3, 0.6, 12);
-                const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.75, 8);
-                const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.65, 8);
-                const footGeo = new THREE.BoxGeometry(0.18, 0.08, 0.3);
-                const hairGeo = new THREE.SphereGeometry(0.15, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2); // Halbkugel für Haare
-                const eyeGeo = new THREE.SphereGeometry(0.03, 8, 8);
-                const mouthGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.02, 12, 1, false, 0, Math.PI); // Halb-Zylinder für Mund
-
-
-                // Material-Paletten
-                const skinTones = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0xffdbac].map(c => new THREE.Color(c));
-                const shirtColors = [0x1e88e5, 0xd81b60, 0x004d40, 0xffc107, 0x6d4c41, 0x455a64, 0xf5f5f5, 0x212121].map(c => new THREE.Color(c));
-                const pantsColors = [0x212121, 0x37474f, 0x0d47a1, 0x5d4037, 0x1b5e20].map(c => new THREE.Color(c));
-                const hairColors = [0x1a1a1a, 0x252525, 0x555555, 0x666666, 0xb0916a, 0xc9a67d].map(c => new THREE.Color(c));
-
-                // Instanced Meshes für jeden Körperteil
-                const bodyPartMaterial = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-                const shoesMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
-                const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-                const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x5c2121 });
-
-                const headMesh = new THREE.InstancedMesh(headGeo, bodyPartMaterial.clone(), totalPeople);
-                const torsoMesh = new THREE.InstancedMesh(torsoGeo, bodyPartMaterial.clone(), totalPeople);
-                const armLeftMesh = new THREE.InstancedMesh(armGeo, bodyPartMaterial.clone(), totalPeople);
-                const armRightMesh = new THREE.InstancedMesh(armGeo, bodyPartMaterial.clone(), totalPeople);
-                const legLeftMesh = new THREE.InstancedMesh(legGeo, bodyPartMaterial.clone(), totalPeople);
-                const legRightMesh = new THREE.InstancedMesh(legGeo, bodyPartMaterial.clone(), totalPeople);
-                const footLeftMesh = new THREE.InstancedMesh(footGeo, shoesMaterial, totalPeople);
-                const footRightMesh = new THREE.InstancedMesh(footGeo, shoesMaterial, totalPeople);
-                const hairMesh = new THREE.InstancedMesh(hairGeo, bodyPartMaterial.clone(), totalPeople);
-                const eyeLeftMesh = new THREE.InstancedMesh(eyeGeo, eyeMaterial, totalPeople);
-                const eyeRightMesh = new THREE.InstancedMesh(eyeGeo, eyeMaterial, totalPeople);
-                const mouthMesh = new THREE.InstancedMesh(mouthGeo, mouthMaterial, totalPeople);
-
-                // Schatten für Personen
-                [headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh].forEach(mesh => {
-                    mesh.castShadow = true;
-                    mesh.receiveShadow = true;
-                });
-
-                stationGroup.add(headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh);
-
-                const dummy = new THREE.Object3D();
-                const tempMatrix = new THREE.Matrix4();
-
-                const minXRelativeFromEdge = 0.3;
-                const maxXRelativeFromEdge = 2.5; // Walk further from the edge
-                const minXRelative = -STATION_PLATFORM_WIDTH / 2 + minXRelativeFromEdge;
-                const maxXRelative = -STATION_PLATFORM_WIDTH / 2 + maxXRelativeFromEdge;
-                const minZRelative = -station.length / 2 + 2;
-                const maxZRelative = station.length / 2 - 2;
-
-                // References to all meshes for easier access in the animation loop
-                station.bodyMeshes = { headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh };
-
-
-                for (let i = 0; i < totalPeople; i++) {
-                    // Farben pro Instanz
-                    const skinColor = skinTones[Math.floor(Math.random() * skinTones.length)];
-                    const shirtColor = shirtColors[Math.floor(Math.random() * shirtColors.length)];
-                    const pantsColor = pantsColors[Math.floor(Math.random() * pantsColors.length)];
-                    const hairColor = hairColors[Math.floor(Math.random() * hairColors.length)];
-
-                    headMesh.setColorAt(i, skinColor);
-                    armLeftMesh.setColorAt(i, skinColor);
-                    armRightMesh.setColorAt(i, skinColor);
-                    torsoMesh.setColorAt(i, shirtColor);
-                    legLeftMesh.setColorAt(i, pantsColor);
-                    legRightMesh.setColorAt(i, pantsColor);
-                    hairMesh.setColorAt(i, hairColor);
-
-                    // Position und Rotation der gesamten Person
-                    const onLeftSide = i < numPeoplePerSide;
-                    const randomXRelative = Math.random() * (maxXRelative - minXRelative) + minXRelative;
-                    const randomZRelative = Math.random() * (maxZRelative - minZRelative) + minZRelative;
-
-                    const personPosition = new THREE.Vector3(
-                        onLeftSide ? STATION_PLATFORM_OFFSET + randomXRelative : -(STATION_PLATFORM_OFFSET + randomXRelative),
-                        STATION_PLATFORM_HEIGHT,
-                        randomZRelative
-                    );
-                    dummy.position.copy(personPosition);
-                    dummy.rotation.y = Math.random() * Math.PI * 2;
-                    dummy.updateMatrix();
-
-                    // Store animation data
-                    station.people.push({
-                        id: i,
-                        position: personPosition,
-                        target: new THREE.Vector3(
-                            onLeftSide ? STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative) : -(STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative)),
-                            STATION_PLATFORM_HEIGHT,
-                            Math.random() * (maxZRelative - minZRelative) + minZRelative
-                        ),
-                        speed: 0.5 + Math.random() * 0.5, // m/s
-                        rotation: new THREE.Quaternion().setFromEuler(dummy.rotation)
-                    });
-
-
-                    // Anwenden der Transformation auf jeden Körperteil mit seiner relativen Position
-                    const setPartMatrix = (mesh, x, y, z, rotX = 0, rotY = 0, rotZ = 0) => {
-                        const partDummy = new THREE.Object3D();
-                        partDummy.position.set(x, y, z);
-                        partDummy.rotation.set(rotX, rotY, rotZ);
-                        partDummy.updateMatrix();
-                        mesh.setMatrixAt(i, tempMatrix.multiplyMatrices(dummy.matrix, partDummy.matrix));
-                    };
-
-                    setPartMatrix(headMesh, 0, 1.6, 0);
-                    setPartMatrix(torsoMesh, 0, 1.15, 0);
-                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, 0, 0, 0.15);
-                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, 0, 0, -0.15);
-                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0);
-                    setPartMatrix(legRightMesh, 0.12, 0.45, 0);
-                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05);
-                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05);
-                    setPartMatrix(hairMesh, 0, 1.7, 0);
-                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15);
-                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15);
-                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, Math.PI / 2, -Math.PI / 2, 0);
+                if (isInitialLoad) {
+                    setupControls();
+                    initAudio();
+                    animate();
                 }
 
-                // Wichtig: Updates für Matrizen und Farben anstoßen
-                headMesh.instanceMatrix.needsUpdate = true;
-                headMesh.instanceColor.needsUpdate = true;
-                torsoMesh.instanceMatrix.needsUpdate = true;
-                torsoMesh.instanceColor.needsUpdate = true;
-                armLeftMesh.instanceMatrix.needsUpdate = true;
-                armLeftMesh.instanceColor.needsUpdate = true;
-                armRightMesh.instanceMatrix.needsUpdate = true;
-                armRightMesh.instanceColor.needsUpdate = true;
-                legLeftMesh.instanceMatrix.needsUpdate = true;
-                legLeftMesh.instanceColor.needsUpdate = true;
-                legRightMesh.instanceMatrix.needsUpdate = true;
-                legRightMesh.instanceColor.needsUpdate = true;
-                footLeftMesh.instanceMatrix.needsUpdate = true;
-                footRightMesh.instanceMatrix.needsUpdate = true;
-                hairMesh.instanceMatrix.needsUpdate = true;
-                hairMesh.instanceColor.needsUpdate = true;
-                eyeLeftMesh.instanceMatrix.needsUpdate = true;
-                eyeRightMesh.instanceMatrix.needsUpdate = true;
-                mouthMesh.instanceMatrix.needsUpdate = true;
-            });
+            }, 50);
         }
 
-        // --- Animation-related temporary variables to avoid allocations in the loop ---
-        const _personTargetDirection = new THREE.Vector3();
-        const _personRotationQuaternion = new THREE.Quaternion();
-        const _personLookAtMatrix = new THREE.Matrix4();
-        const _personMatrix = new THREE.Matrix4();
-        const _partDummy = new THREE.Object3D();
-        const _finalPartMatrix = new THREE.Matrix4();
-        const _upVector = new THREE.Vector3(0, 1, 0);
-        const _scaleVector = new THREE.Vector3(1, 1, 1);
-
-
-        function updatePeopleAnimation(dt) {
-            const minXRelativeFromEdge = 0.3;
-            const maxXRelativeFromEdge = 2.5;
-
-            for (const station of stations) {
-                if (!station.people || !station.bodyMeshes) continue;
-
-                const minZRelative = -station.length / 2 + 2;
-                const maxZRelative = station.length / 2 - 2;
-                const minXRelative = -STATION_PLATFORM_WIDTH / 2 + minXRelativeFromEdge;
-                const maxXRelative = -STATION_PLATFORM_WIDTH / 2 + maxXRelativeFromEdge;
-
-                for (const person of station.people) {
-                    // 1. Check if target is reached and set a new one
-                    if (person.position.distanceTo(person.target) < 0.5) {
-                        const onLeftSide = person.position.x > 0;
-                        person.target.set(
-                           onLeftSide ? STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative) : -(STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative)),
-                           person.position.y,
-                           Math.random() * (maxZRelative - minZRelative) + minZRelative
-                        );
-                    }
-
-                    // 2. Smoothly rotate towards the target
-                    _personLookAtMatrix.lookAt(person.target, person.position, _upVector);
-                    _personRotationQuaternion.setFromRotationMatrix(_personLookAtMatrix);
-                    person.rotation.slerp(_personRotationQuaternion, dt * 2.0);
-
-                    // 3. Move towards the target
-                    _personTargetDirection.subVectors(person.target, person.position).normalize();
-                    person.position.addScaledVector(_personTargetDirection, person.speed * dt);
-
-                    // 4. Update the main transformation matrix for this person's instance
-                    _personMatrix.compose(person.position, person.rotation, _scaleVector);
-
-                    // 5. Apply this transformation to all body part instances
-                    const { headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh } = station.bodyMeshes;
-
-                    // --- Procedural Walk Cycle ---
-                    const walkCycle = Math.sin(clock.elapsedTime * person.speed * 5);
-                    const walkAngle = walkCycle * 0.4; // 0.4 radians amplitude
-
-                    const setPartMatrix = (mesh, x, y, z, rotX = 0, rotY = 0, rotZ = 0) => {
-                        _partDummy.position.set(x, y, z);
-                        _partDummy.rotation.set(rotX, rotY, rotZ);
-                        _partDummy.updateMatrix();
-                        _finalPartMatrix.multiplyMatrices(_personMatrix, _partDummy.matrix);
-                        mesh.setMatrixAt(person.id, _finalPartMatrix);
-                    };
-
-                    setPartMatrix(headMesh, 0, 1.6, 0);
-                    setPartMatrix(torsoMesh, 0, 1.15, 0);
-                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, walkAngle, 0, 0.15);
-                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, -walkAngle, 0, -0.15);
-                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0, -walkAngle, 0, 0);
-                    setPartMatrix(legRightMesh, 0.12, 0.45, 0, walkAngle, 0, 0);
-                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05, -walkAngle, 0, 0);
-                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05, walkAngle, 0, 0);
-                    setPartMatrix(hairMesh, 0, 1.7, 0);
-                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15);
-                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15);
-                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, Math.PI / 2, -Math.PI / 2, 0);
-                }
-
-                // After updating all matrices for this station, flag them for update
-                for (const mesh of Object.values(station.bodyMeshes)) {
-                    mesh.instanceMatrix.needsUpdate = true;
-                }
+        function createTrackCurve(numSegments) {
+            const points = [];
+            let pos = new THREE.Vector3(0, 0, 0);
+            let dir = new THREE.Vector3(0, 0, -1);
+            for (let i = 0; i < numSegments; i++) {
+                points.push(pos.clone());
+                const turn = (Math.random() - 0.5) * 0.4;
+                const pitch = (Math.random() - 0.5) * 0.1;
+                const quaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), turn);
+                dir.applyQuaternion(quaternion);
+                const pitchQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
+                dir.applyQuaternion(pitchQuat);
+                dir.normalize();
+                pos.add(dir.clone().multiplyScalar(200));
             }
-        }
-
-
-        function createSignals(curve) {
-            if (signals.length === 0) return;
-
-            const mastHeight = 3.6;
-            const mastGeo = new THREE.CylinderGeometry(0.1, 0.15, mastHeight, 8);
-            const lightBoxGeo = new THREE.BoxGeometry(0.4, 0.8, 0.4);
-            const lightGeo = new THREE.SphereGeometry(0.15, 16, 16);
-
-            // Alle Meshes für die maximale Anzahl an Signalen initialisieren
-            signalMastMesh = new THREE.InstancedMesh(mastGeo, signalMastMaterial, signals.length);
-            redLightBoxMesh = new THREE.InstancedMesh(lightBoxGeo, signalBoxRedMaterial, signals.length);
-            greenLightBoxMesh = new THREE.InstancedMesh(lightBoxGeo, signalBoxGreenMaterial, signals.length);
-            redLightMesh = new THREE.InstancedMesh(lightGeo, signalLightRedMaterial, signals.length);
-            greenLightMesh = new THREE.InstancedMesh(lightGeo, signalLightGreenMaterial, signals.length);
-
-            signalMastMesh.castShadow = true;
-            redLightBoxMesh.castShadow = true;
-            greenLightBoxMesh.castShadow = true;
-
-            const dummy = new THREE.Object3D();
-            const pos = new THREE.Vector3();
-            const tangent = new THREE.Vector3();
-            const up = new THREE.Vector3(0, 1, 0);
-            const binormal = new THREE.Vector3();
-            const normal = new THREE.Vector3();
-
-            signals.forEach((signal, i) => {
-                signal.meshIndex = i; // Wichtig, um das Signal später zu finden
-
-                const t = signal.distance / totalTrackLength;
-                curve.getPointAt(t, pos);
-                curve.getTangentAt(t, tangent);
-
-                binormal.crossVectors(up, tangent).normalize();
-                normal.crossVectors(tangent, binormal).normalize();
-
-                const signalSideOffset = -2.5; // Rechts von der Strecke
-
-                // --- Mast Positionierung ---
-                const mastBasePos = pos.clone().addScaledVector(binormal, signalSideOffset);
-                const mastCenterPos = mastBasePos.clone().addScaledVector(normal, 1.3);
-                dummy.position.copy(mastCenterPos);
-                dummy.up.copy(normal);
-                dummy.lookAt(mastCenterPos.clone().add(tangent));
-                dummy.scale.set(1, 1, 1);
-                dummy.updateMatrix();
-                signalMastMesh.setMatrixAt(i, dummy.matrix);
-
-                // --- Lichtkasten Positionierung ---
-                const lightBoxPos = mastBasePos.clone().addScaledVector(normal, 3.5);
-                const lightPos = lightBoxPos.clone().addScaledVector(tangent.clone().negate(), 0.2);
-
-                // Store transform data for later updates
-                signal.transform = {
-                    lightBoxPos: lightBoxPos.clone(),
-                    lightPos: lightPos.clone(),
-                    up: normal.clone(),
-                    lookAt: lightBoxPos.clone().sub(tangent)
-                };
-
-                dummy.position.copy(lightBoxPos);
-                dummy.up.copy(normal);
-                dummy.lookAt(lightBoxPos.clone().sub(tangent));
-
-                // --- Sichtbarkeit basierend auf initialer Farbe ---
-                const isRed = signal.color === 'red';
-
-                // Roter Kasten und Licht
-                dummy.scale.set(isRed ? 1 : 0, isRed ? 1 : 0, isRed ? 1 : 0);
-                dummy.updateMatrix();
-                redLightBoxMesh.setMatrixAt(i, dummy.matrix);
-
-                // Position für Licht anpassen, Skalierung beibehalten
-                dummy.position.copy(lightPos);
-                dummy.updateMatrix();
-                redLightMesh.setMatrixAt(i, dummy.matrix);
-
-                // Grüner Kasten und Licht
-                dummy.scale.set(isRed ? 0 : 1, isRed ? 0 : 1, isRed ? 0 : 1);
-                dummy.position.copy(lightBoxPos); // Position für Kasten zurücksetzen
-                dummy.up.copy(normal);
-                dummy.lookAt(lightBoxPos.clone().sub(tangent));
-                dummy.updateMatrix();
-                greenLightBoxMesh.setMatrixAt(i, dummy.matrix);
-
-                // Position für Licht anpassen, Skalierung beibehalten
-                dummy.position.copy(lightPos);
-                dummy.updateMatrix();
-                greenLightMesh.setMatrixAt(i, dummy.matrix);
-            });
-
-            // Alle Meshes zur Szene hinzufügen
-            signalMastMesh.instanceMatrix.needsUpdate = true;
-            redLightBoxMesh.instanceMatrix.needsUpdate = true;
-            greenLightBoxMesh.instanceMatrix.needsUpdate = true;
-            redLightMesh.instanceMatrix.needsUpdate = true;
-            greenLightMesh.instanceMatrix.needsUpdate = true;
-
-            trackGroup.add(signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh);
-        }
-
-        function updateSignalVisuals(signal) {
-            const index = signal.meshIndex;
-            if (index === undefined || !signal.transform) return;
-
-            const isRed = signal.color === 'red';
-            const dummy = new THREE.Object3D();
-            const { lightBoxPos, lightPos, up, lookAt } = signal.transform;
-
-            // --- Rote Komponenten ---
-            dummy.position.copy(lightBoxPos);
-            dummy.up.copy(up);
-            dummy.lookAt(lookAt);
-            dummy.scale.set(isRed ? 1 : 0, isRed ? 1 : 0, isRed ? 1 : 0);
-            dummy.updateMatrix();
-            redLightBoxMesh.setMatrixAt(index, dummy.matrix);
-
-            dummy.position.copy(lightPos); // Nur Position für das Licht ändern
-            dummy.updateMatrix();
-            redLightMesh.setMatrixAt(index, dummy.matrix);
-
-            // --- Grüne Komponenten ---
-            dummy.position.copy(lightBoxPos);
-            dummy.up.copy(up);
-            dummy.lookAt(lookAt);
-            dummy.scale.set(isRed ? 0 : 1, isRed ? 0 : 1, isRed ? 0 : 1);
-            dummy.updateMatrix();
-            greenLightBoxMesh.setMatrixAt(index, dummy.matrix);
-
-            dummy.position.copy(lightPos); // Nur Position für das Licht ändern
-            dummy.updateMatrix();
-            greenLightMesh.setMatrixAt(index, dummy.matrix);
-
-            // Wichtig: Die .needsUpdate Flags setzen
-            redLightBoxMesh.instanceMatrix.needsUpdate = true;
-            redLightMesh.instanceMatrix.needsUpdate = true;
-            greenLightBoxMesh.instanceMatrix.needsUpdate = true;
-            greenLightMesh.instanceMatrix.needsUpdate = true;
+            return new THREE.CatmullRomCurve3(points, true, 'catmullrom', 0.5);
         }
         
-        // --- Cockpit Erstellung ---
-        function createDriverCab() {
-            driverCab = new THREE.Group();
-            
-            const cabMat = new THREE.MeshPhongMaterial({ 
-                color: 0x333333, 
-                side: THREE.DoubleSide, 
-                transparent: true,    
-                opacity: 0.3,         
-                shininess: 50,        
-                specular: 0x222222     
-            });
-            
-            const dashGeo = new THREE.BoxGeometry(1.5, 0.1, 0.03); 
-            const dash = new THREE.Mesh(dashGeo, cabMat);
-            
-            dash.position.set(0, -1.0, -1.8); 
-            driverCab.add(dash);
+        function createTrackGeometry(curve, length) {
+            // A placeholder geometry
+            const material = new THREE.MeshStandardMaterial({ color: 0x555555, side: THREE.BackSide });
+            const geometry = new THREE.TubeGeometry(curve, Math.floor(length / 10), 10, 8, false);
+            const tunnel = new THREE.Mesh(geometry, material);
+            return { tunnel, ties: new THREE.Group() };
         }
 
-        // --- Steuerung ---
+        function createStations() { /* Placeholder */ }
+        function createSignals() { /* Placeholder */ }
+
+        function setupHeadlight() {
+            headlight = new THREE.SpotLight(0xffffff, 1.5, 1000, Math.PI / 4, 0.5, 2);
+            headlight.castShadow = true;
+            headlight.shadow.mapSize.width = 1024;
+            headlight.shadow.mapSize.height = 1024;
+            headlight.shadow.camera.near = 0.5;
+            headlight.shadow.camera.far = 1000;
+            camera.add(headlight);
+            headlight.position.set(0, 0, 1);
+            headlight.target = camera;
+        }
+
+        function initAudio() {
+             document.body.addEventListener('click', async () => {
+                if (audioReady) return;
+                await Tone.start();
+                console.log('Audio is ready');
+                audioReady = true;
+                // Start transport for any time-based audio events
+                Tone.Transport.start();
+            }, { once: true });
+        }
+
+        function animate() {
+            if (isPaused) {
+                requestAnimationFrame(animate);
+                return;
+            }
+
+            const delta = clock.getDelta();
+            requestAnimationFrame(animate);
+
+            updatePhysics(delta);
+            updatePlayerPosition();
+            checkStationStatus();
+            checkSignalStatus();
+            updateUI();
+
+            composer.render();
+        }
+
+        function updatePhysics(delta) {
+            window.playerSpeed += window.throttle * ACCELERATION * delta;
+            let brakeEffect = window.brake * BRAKE_FORCE * delta;
+            window.playerSpeed = Math.sign(window.playerSpeed) * Math.max(0, Math.abs(window.playerSpeed) - brakeEffect);
+            let frictionEffect = FRICTION * delta;
+            window.playerSpeed = Math.sign(window.playerSpeed) * Math.max(0, Math.abs(window.playerSpeed) - frictionEffect);
+            window.playerSpeed = Math.max(-MAX_SPEED / 3.6, Math.min(MAX_SPEED / 3.6, window.playerSpeed));
+            window.playerDistance += window.playerSpeed * delta;
+            if (window.playerDistance > totalTrackLength) window.playerDistance -= totalTrackLength;
+            if (window.playerDistance < 0) window.playerDistance += totalTrackLength;
+        }
+        
+        function updatePlayerPosition() {
+            const progress = window.playerDistance / totalTrackLength;
+            const pos = trackCurve.getPointAt(progress);
+            const tangent = trackCurve.getTangentAt(progress);
+            camera.position.copy(pos);
+            camera.position.y += 1.5;
+            const lookAtPos = pos.clone().add(tangent);
+            camera.lookAt(lookAtPos);
+        }
+
+        function checkStationStatus() { /* Placeholder */ }
+        function checkSignalStatus() { /* Placeholder */ }
+
+        function updateUI() {
+            document.getElementById('speed-display').textContent = `Speed: ${Math.round(Math.abs(window.playerSpeed * 3.6))} km/h`;
+            document.getElementById('score-display').textContent = `Score: ${window.score}`;
+        }
+
         function setupControls() {
-            ui.throttleSlider.addEventListener('input', (e) => {
-                window.throttle = parseInt(e.target.value) / 100;
-                ui.throttleValue.innerText = `${e.target.value}%`;
-                if (window.throttle > 0) {
-                    window.brake = 0;
-                    ui.brakeSlider.value = 0;
-                    ui.brakeValue.innerText = '0%';
-                }
+            document.addEventListener('keydown', (e) => {
+                if(isPaused) return;
+                if (e.key === 'w' || e.key === 'W') window.throttle = 1;
+                if (e.key === 's' || e.key === 'S') window.brake = 1;
             });
+
+             document.addEventListener('keyup', (e) => {
+                if (e.key === 'w' || e.key === 'W') window.throttle = 0;
+                if (e.key === 's' || e.key === 'S') window.brake = 0;
+            });
+
+            document.getElementById('pause-button').addEventListener('click', () => togglePause());
+            document.getElementById('resume-button').addEventListener('click', () => togglePause());
             
-            ui.brakeSlider.addEventListener('input', (e) => {
-                window.brake = parseInt(e.target.value) / 100;
-                ui.brakeValue.innerText = `${e.target.value}%`;
-                if (window.brake > 0) {
-                    window.throttle = 0;
-                    ui.throttleSlider.value = 0;
-                    ui.throttleValue.innerText = '0%';
+            document.getElementById('save-button').addEventListener('click', saveGame);
+            document.getElementById('load-button').addEventListener('click', () => {
+                const savedGame = localStorage.getItem('pocketSubwaySave');
+                if (savedGame) {
+                    if(isPaused) togglePause(false);
+                    loadGame(JSON.parse(savedGame));
+                } else {
+                    alert('No saved game found!');
                 }
             });
 
-            ui.throttleSlider.addEventListener('mouseup', () => {
-                ui.throttleSlider.value = 0;
-                window.throttle = 0;
-                ui.throttleValue.innerText = '0%';
-            });
-            
-            ui.doorButton.addEventListener('click', () => {
-                if (atStation && window.playerSpeed < 0.1) {
-                    doorsOpen = !doorsOpen;
-                    updateDoorButton();
-                    if (doorsOpen) {
-                        handlePassengerExchange();
-                        if (audioStarted) {
-                            stationAmbienceSound?.volume.rampTo(-25, 0.5);
-                            doorOpenSound?.start();
-                        }
-                    } else {
-                        if (audioStarted) {
-                            stationAmbienceSound?.volume.rampTo(-Infinity, 0.5);
-                            doorCloseSound?.start();
-                        }
-                    }
-                }
-            });
-
-            // Pause-Steuerung
-            ui.pauseButton.addEventListener('click', togglePause);
-            ui.resumeButton.addEventListener('click', togglePause);
-            ui.closeUpgradeMenuButton.addEventListener('click', togglePause); // New button also unpauses
-
-            // Achievements Menu Listeners
-            ui.achievementsButton.addEventListener('click', () => {
-                if (!isPaused) {
-                    togglePause(); // Ensure paused
-                }
-                ui.mainPauseMenu.classList.add('hidden');
-                ui.achievementsMenu.classList.remove('hidden');
-                updateAchievementsUI();
-            });
-
-            ui.closeAchievementsMenuButton.addEventListener('click', () => {
-                // Back to main pause menu
-                ui.achievementsMenu.classList.add('hidden');
-                ui.mainPauseMenu.classList.remove('hidden');
-            });
-
-            ui.restartButton.addEventListener('click', () => {
-                window.location.reload();
-            });
-            ui.saveButton.addEventListener('click', saveGame);
-            ui.loadButton.addEventListener('click', loadGame);
-            window.addEventListener('keydown', (e) => {
-                if (e.key === 'p' || e.key === 'Escape') {
-                    togglePause(); // Toggles pause, closes any open menu
-                }
-            });
-
-            // Cheat code: 10 schnelle Klicks auf den Punktestand für +1000 Punkte
-            let scoreClickCount = 0;
-            let lastScoreClickTime = 0;
-            ui.creditsDisplay.parentElement.addEventListener('click', () => { // Listener auf dem Elternelement für eine größere Klickfläche
-                const now = Date.now();
-                if (now - lastScoreClickTime > 400) { // Zeitfenster von 400ms
-                    scoreClickCount = 0;
-                }
-                lastScoreClickTime = now;
-                scoreClickCount++;
-
-                if (scoreClickCount >= 10) {
-                    window.credits += 1000;
-                    scoreClickCount = 0;
-
-                    // Visuelles Feedback
-                    const scoreContainer = ui.creditsDisplay.parentElement;
-                    scoreContainer.style.transition = 'transform 0.1s ease-in-out';
-                    scoreContainer.style.transform = 'scale(1.2)';
-                    setTimeout(() => {
-                        scoreContainer.style.transform = 'scale(1)';
-                    }, 100);
-                }
-            });
-
-            // Upgrade-Menü-Steuerung
-            ui.upgradesButton.addEventListener('click', () => {
-                // This button (the new icon) pauses the game and shows the upgrade menu.
-                if (!isPaused) {
-                    isPaused = true;
-                    clock.stop();
-                    ui.pauseMenu.classList.remove('hidden');
-                    ui.pauseMenu.classList.add('flex');
-                     if (audioStarted) {
-                        if (engineSound && engineSound.state === "started") engineSound.volume.rampTo(-Infinity, 0.1);
-                        if (brakeSound && brakeSound.volume.value > -Infinity) brakeSound.triggerRelease(Tone.now());
-                    }
-                }
-                // Now that we are definitely paused, show the correct menu.
-                ui.mainPauseMenu.classList.add('hidden');
-                ui.upgradeMenu.classList.remove('hidden');
-                updateUpgradeUI();
-            });
-
-            // Kauf-Buttons
-            ui.buyAccelerationButton.addEventListener('click', () => buyUpgrade('acceleration'));
-            ui.buyBrakingButton.addEventListener('click', () => buyUpgrade('braking'));
-            ui.buyMaxSpeedButton.addEventListener('click', () => buyUpgrade('maxSpeed'));
-            ui.buyScoreMultiplierButton.addEventListener('click', () => buyUpgrade('scoreMultiplier'));
-
-            // Settings Toggles
-            document.getElementById('headlight-toggle').addEventListener('change', (e) => {
-                const isHeadlightOn = e.target.checked;
-                if (headlight) headlight.visible = isHeadlightOn;
-
-                // Wenn Scheinwerfer aus, Ambient Light erhöhen, um Tunnel sichtbar zu machen
-                if (ambientLight) {
-                    ambientLight.intensity = isHeadlightOn ? 0.1 : 0.5;
-                }
-            });
-
-            document.getElementById('sound-toggle').addEventListener('change', (e) => {
-                Tone.Destination.mute = !e.target.checked;
+            const soundToggle = document.getElementById('sound-toggle');
+            soundToggle.addEventListener('change', () => {
+                Tone.Destination.mute = !soundToggle.checked;
             });
         }
-
-        function handlePassengerExchange() {
-            if (!currentStation || currentStation.passengersExchanged) return;
-
-            const arrivingPassengers = Math.floor(Math.random() * (passengers + 1));
-            const departingPassengers = Math.floor(Math.random() * 10) + 5;
-            const income = Math.round(arrivingPassengers * 10 * scoreMultiplier);
-            passengers -= arrivingPassengers;
-            passengers += departingPassengers;
-
-            let message = `\n${arrivingPassengers} Passagiere ausgestiegen. +${income} Credits!`;
-
-            window.credits += income;
-            currentStation.passengersExchanged = true; // Mark exchange as complete
-
-            // Update status message specifically for passenger exchange
-            ui.statusMessage.innerText += message; // Append to existing message
-
-            updateAchievementProgress('passengers', arrivingPassengers);
-        }
-
-        // --- Daily Achievements Logik ---
-        function initializeDailyAchievements() {
-            const today = new Date().toISOString().split('T')[0];
-
-            if (dailyAchievements.date !== today) {
-                // Reset oder Init für neuen Tag
-                dailyAchievements = {
-                    date: today,
-                    list: [
-                        { id: 'distance', description: 'Strecken-König: Fahre 5 km', target: 5000, current: 0, completed: false, reward: 500, unit: 'm' },
-                        { id: 'passengers', description: 'Menschenfreund: Befördere 50 Passagiere', target: 50, current: 0, completed: false, reward: 300, unit: 'Pax' },
-                        { id: 'punctual', description: 'Pünktlichkeits-Profi: 3 pünktliche Ankünfte', target: 3, current: 0, completed: false, reward: 400, unit: '' }
-                    ]
-                };
-                totalDistanceTraveled = 0; // Reset daily distance tracking
-                console.log("Daily Achievements reset for: " + today);
-            }
-        }
-
-        function updateAchievementProgress(id, amount) {
-            const achievement = dailyAchievements.list.find(a => a.id === id);
-            if (!achievement || achievement.completed) return;
-
-            achievement.current += amount;
-            if (achievement.current >= achievement.target) {
-                achievement.current = achievement.target;
-                achievement.completed = true;
-                window.credits += achievement.reward;
-
-                // Notification
-                const message = `Aufgabe erledigt: ${achievement.description.split(':')[0]}! +${achievement.reward} Credits`;
-                // Wir nutzen ui.statusMessage kurz, falls sie nicht belegt ist, oder überschreiben sie
-                 ui.statusMessage.dataset.achievement = id; // Prevent overwriting by loop
-                 ui.statusMessage.innerText = message;
-                 ui.statusMessage.classList.remove('hidden', 'bg-red-500', 'bg-blue-600');
-                 ui.statusMessage.classList.add('bg-green-500');
-                 setTimeout(() => {
-                     // Check if message is still the same before hiding
-                     if (ui.statusMessage.dataset.achievement === id) {
-                         ui.statusMessage.classList.add('hidden');
-                         delete ui.statusMessage.dataset.achievement;
-                     }
-                 }, 4000);
-            }
-        }
-
-        function updateAchievementsUI() {
-            ui.achievementsList.innerHTML = '';
-
-            dailyAchievements.list.forEach(ach => {
-                const item = document.createElement('div');
-                item.className = 'flex flex-col bg-gray-800 p-4 rounded-md space-y-2';
-
-                const header = document.createElement('div');
-                header.className = 'flex justify-between items-center';
-
-                const title = document.createElement('h3');
-                title.className = 'text-xl font-bold';
-                title.innerText = ach.description;
-                if (ach.completed) {
-                    title.classList.add('text-green-500');
-                    title.innerText += ' (Erledigt)';
-                }
-
-                const reward = document.createElement('div');
-                reward.className = 'text-right text-yellow-400 font-bold';
-                reward.innerText = `+${ach.reward} C`;
-
-                header.appendChild(title);
-                header.appendChild(reward);
-
-                // Progress Bar
-                const progressContainer = document.createElement('div');
-                progressContainer.className = 'w-full bg-gray-700 rounded-full h-4';
-
-                const progressBar = document.createElement('div');
-                const pct = Math.min(100, (ach.current / ach.target) * 100);
-                progressBar.className = 'bg-blue-500 h-4 rounded-full transition-all duration-500';
-                progressBar.style.width = `${pct}%`;
-                if (ach.completed) progressBar.classList.replace('bg-blue-500', 'bg-green-500');
-
-                progressContainer.appendChild(progressBar);
-
-                const progressText = document.createElement('p');
-                progressText.className = 'text-sm text-gray-400 text-right';
-                progressText.innerText = `${Math.floor(ach.current)} / ${ach.target} ${ach.unit}`;
-
-                item.appendChild(header);
-                item.appendChild(progressContainer);
-                item.appendChild(progressText);
-
-                ui.achievementsList.appendChild(item);
-            });
-        }
-
-        // --- Upgrade-System Logik ---
-        function applyUpgrades() {
-            MAX_THROTTLE_FORCE = BASE_MAX_THROTTLE_FORCE * (1 + (accelerationLevel - 1) * 0.15); // +15% pro Level
-            MAX_BRAKE_FORCE = BASE_MAX_BRAKE_FORCE * (1 + (brakingLevel - 1) * 0.15);       // +15% pro Level
-            MAX_SPEED = BASE_MAX_SPEED * (1 + (maxSpeedLevel - 1) * 0.1);                   // +10% pro Level
-            scoreMultiplier = 1 + (scoreMultiplierLevel - 1) * 0.25;                       // +25% pro Level
-        }
-
-        function updateUpgradeUI() {
-            ui.accelerationLevelDisplay.innerText = accelerationLevel;
-            ui.brakingLevelDisplay.innerText = brakingLevel;
-            ui.maxSpeedLevelDisplay.innerText = maxSpeedLevel;
-            ui.scoreMultiplierLevelDisplay.innerText = scoreMultiplierLevel;
-
-            // Kosten dynamisch berechnen:
-			const calcCost = (baseCost, level) => Math.floor(baseCost * level / 4);
-
-            ui.buyAccelerationButton.dataset.cost = calcCost(150, accelerationLevel);
-            ui.buyBrakingButton.dataset.cost = calcCost(150, brakingLevel);
-            ui.buyMaxSpeedButton.dataset.cost = calcCost(250, maxSpeedLevel);
-            ui.buyScoreMultiplierButton.dataset.cost = calcCost(500, scoreMultiplierLevel);
-
-            ui.buyAccelerationButton.innerText = `Kaufen: ${ui.buyAccelerationButton.dataset.cost} C`;
-            ui.buyBrakingButton.innerText = `Kaufen: ${ui.buyBrakingButton.dataset.cost} C`;
-            ui.buyMaxSpeedButton.innerText = `Kaufen: ${ui.buyMaxSpeedButton.dataset.cost} C`;
-            ui.buyScoreMultiplierButton.innerText = `Kaufen: ${ui.buyScoreMultiplierButton.dataset.cost} C`;
-
-            // Buttons deaktivieren, wenn nicht genug Credits
-            ui.buyAccelerationButton.disabled = window.credits < ui.buyAccelerationButton.dataset.cost;
-            ui.buyBrakingButton.disabled = window.credits < ui.buyBrakingButton.dataset.cost;
-            ui.buyMaxSpeedButton.disabled = window.credits < ui.buyMaxSpeedButton.dataset.cost;
-            ui.buyScoreMultiplierButton.disabled = window.credits < ui.buyScoreMultiplierButton.dataset.cost;
-        }
-
-
-        function buyUpgrade(type) {
-            let cost, level;
-            switch (type) {
-                case 'acceleration':
-                    cost = parseInt(ui.buyAccelerationButton.dataset.cost);
-                    if (window.credits >= cost) {
-                        window.credits -= cost;
-                        accelerationLevel++;
-                    }
-                    break;
-                case 'braking':
-                     cost = parseInt(ui.buyBrakingButton.dataset.cost);
-                    if (window.credits >= cost) {
-                        window.credits -= cost;
-                        brakingLevel++;
-                    }
-                    break;
-                case 'maxSpeed':
-                     cost = parseInt(ui.buyMaxSpeedButton.dataset.cost);
-                    if (window.credits >= cost) {
-                        window.credits -= cost;
-                        maxSpeedLevel++;
-                    }
-                    break;
-                case 'scoreMultiplier':
-                     cost = parseInt(ui.buyScoreMultiplierButton.dataset.cost);
-                    if (window.credits >= cost) {
-                        window.credits -= cost;
-                        scoreMultiplierLevel++;
-                    }
-                    break;
-            }
-            applyUpgrades();
-            updateUpgradeUI();
+        
+        function togglePause(forceState = null) {
+            isPaused = forceState !== null ? forceState : !isPaused;
+            document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none';
         }
 
         function saveGame() {
-            try {
-                // Umfassenderer Spielzustand
-                const gameState = {
-                    saveVersion: 4, // Version erhöht
-
-                    // Spieler-Zustand
-                    playerDistance: window.playerDistance,
-                    playerSpeed: window.playerSpeed,
-                    throttle: window.throttle,
-                    brake: window.brake,
-                    credits: window.credits,
-                    passengers: passengers,
-
-                    // Achievements Data
-                    dailyAchievements: dailyAchievements,
-                    totalDistanceTraveled: totalDistanceTraveled,
-
-                    // Upgrade Levels
-                    accelerationLevel: accelerationLevel,
-                    brakingLevel: brakingLevel,
-                    maxSpeedLevel: maxSpeedLevel,
-                    scoreMultiplierLevel: scoreMultiplierLevel,
-
-                    // Streckendaten
-                    // Wichtig: THREE.Vector3 muss für JSON in ein einfaches Objekt konvertiert werden
-                    trackPoints: trackCurve.points.map(p => ({ x: p.x, y: p.y, z: p.z })),
-                    totalTrackLength: totalTrackLength,
-
-                    // Vollständige Objekt-Daten
-                    stations: stations, // Speichert das komplette Array
-                    signals: signals.map(s => ({ // Speichere nur die Daten, nicht die 3D-Objekt-Referenzen
-                        distance: s.distance,
-                        color: s.color,
-                        pointsAwarded: s.pointsAwarded,
-                    })),
-
-                    // Pünktlichkeits-Zustand
-                    scheduleTime: scheduleTime,
-                    isScheduleTimerActive: scheduleTimer !== null,
-                };
-
-                const gameStateJSON = JSON.stringify(gameState);
-                localStorage.setItem('pocketSubwaySave', gameStateJSON);
-
-                console.log('Spielstand gespeichert!');
-                const originalText = ui.saveButton.innerText;
-                ui.saveButton.innerText = 'Gespeichert!';
-                ui.saveButton.disabled = true;
-                // UI-Feedback ist so kurz, dass ein Timeout nicht nötig ist und Tests stört.
-                ui.saveButton.innerText = originalText;
-                ui.saveButton.disabled = false;
-
-            } catch (error) {
-                console.error('Fehler beim Speichern des Spiels:', error);
-                const originalText = ui.saveButton.innerText;
-                ui.saveButton.innerText = 'Fehler!';
-                setTimeout(() => { // Kurzes Fehler-Feedback beibehalten
-                    ui.saveButton.innerText = originalText;
-                }, 2000);
-            }
+            const gameState = {
+                playerDistance: window.playerDistance,
+                playerSpeed: window.playerSpeed,
+                throttle: window.throttle,
+                brake: window.brake,
+                score: window.score,
+                trackPoints: trackCurve.points.map(p => ({ x: p.x, y: p.y, z: p.z })),
+            };
+            localStorage.setItem('pocketSubwaySave', JSON.stringify(gameState));
+            const saveButton = document.getElementById('save-button');
+            saveButton.textContent = 'Saved!';
+            setTimeout(() => { saveButton.textContent = 'Save Game'; }, 2000);
         }
 
-        function loadGame() {
-            try {
-                const gameStateJSON = localStorage.getItem('pocketSubwaySave');
-                if (!gameStateJSON) {
-                    console.warn('Kein Spielstand gefunden.');
-                    return;
-                }
-
-                // UI für Ladevorgang vorbereiten
-                if (isPaused) {
-                    ui.pauseMenu.classList.add('hidden');
-                    ui.pauseMenu.classList.remove('flex');
-                }
-                ui.loadingScreen.style.display = 'flex'; // Ladebildschirm anzeigen
-
-                // Asynchroner Ladevorgang, um Einfrieren zu verhindern
-                setTimeout(() => {
-                    try {
-                        const gameState = JSON.parse(gameStateJSON);
-
-                        // Kompatibilität prüfen (bleibt gleich)
-                        if (!gameState.saveVersion || gameState.saveVersion < 3) {
-                             console.warn('Lade veralteten Spielstand. Nur Basis-Daten werden wiederhergestellt.');
-                            window.playerDistance = gameState.playerDistance || 0;
-                            window.credits = gameState.score || 0; // Legacy support
-                            window.playerSpeed = 0;
-                            window.throttle = 0;
-                            window.brake = 0;
-                            accelerationLevel = 1;
-                            brakingLevel = 1;
-                            maxSpeedLevel = 1;
-                            scoreMultiplierLevel = 1;
-                             // Alten Spielstand nicht weiter verarbeiten, da Strecke fehlt
-                            ui.loadingScreen.style.display = 'none';
-                            isPaused = false;
-                            clock.start();
-                            return;
-                        }
-
-                        // --- Laden des neuen, vollständigen Spielstands (v3+) ---
-
-                        // Achievements Laden
-                        if (gameState.saveVersion >= 4 && gameState.dailyAchievements) {
-                            dailyAchievements = gameState.dailyAchievements;
-                            totalDistanceTraveled = gameState.totalDistanceTraveled || 0;
-
-                            // Check reset on load (if day changed while offline)
-                            initializeDailyAchievements();
-                        } else {
-                            // Migration or fresh init
-                            initializeDailyAchievements();
-                        }
-
-                        // Upgrade-Level laden
-                        accelerationLevel = gameState.accelerationLevel || 1;
-                        brakingLevel = gameState.brakingLevel || 1;
-                        maxSpeedLevel = gameState.maxSpeedLevel || 1;
-                        scoreMultiplierLevel = gameState.scoreMultiplierLevel || 1;
-
-                        // 1. Globale Strecken-Variablen explizit zurücksetzen
-                        trackCurve = null;
-                        totalTrackLength = 0;
-                        stations.length = 0;
-                        signals.length = 0;
-
-
-                        // 2. Alle alten Streckenobjekte sicher entfernen
-                        while(trackGroup.children.length > 0){
-                            const obj = trackGroup.children[0];
-                            trackGroup.remove(obj);
-                            if(obj.geometry) obj.geometry.dispose();
-                            if(obj.material) {
-                                if (Array.isArray(obj.material)) {
-                                    obj.material.forEach(m => m.dispose());
-                                } else {
-                                    obj.material.dispose();
-                                }
-                            }
-                        }
-
-
-                        // 3. Spielzustand wiederherstellen
-                        window.playerDistance = gameState.playerDistance;
-                        window.playerSpeed = gameState.playerSpeed;
-                        window.throttle = gameState.throttle;
-                        window.brake = gameState.brake;
-                        window.credits = gameState.credits || gameState.score || 0; // Legacy support
-                        passengers = gameState.passengers || 0;
-                        totalTrackLength = gameState.totalTrackLength;
-
-                        // 4. Globale Arrays mit gespeicherten Daten füllen
-                        gameState.stations.forEach(s => stations.push(s));
-                        gameState.signals.forEach(s => signals.push(s));
-
-                        // 5. Strecke aus den gespeicherten Punkten neu erstellen
-                        const loadedPoints = gameState.trackPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
-                        trackCurve = new THREE.CatmullRomCurve3(loadedPoints);
-                        trackCurve.curveType = 'catmullrom';
-                        trackCurve.tension = 0.5;
-
-                        // 6. Geometrie basierend auf der geladenen Kurve neu aufbauen
-                        createTrackGeometry(trackCurve);
-                        createStations(trackCurve);
-                        createSignals(trackCurve);
-                        const tunnelCircumference = 2 * Math.PI * 5.0;
-                        const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
-                        const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
-                        tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
-                        tunnelMaterial.map.needsUpdate = true;
-
-                        // 7. Pünktlichkeits-Zustand wiederherstellen
-                        scheduleTime = gameState.scheduleTime || 0;
-                        if (scheduleTimer) clearInterval(scheduleTimer);
-                        scheduleTimer = null;
-
-                        if (gameState.isScheduleTimerActive) {
-                            ui.scheduleDisplay.classList.remove('hidden');
-                            ui.scheduleTime.classList.remove('text-red-500');
-                            ui.scheduleTime.classList.add('text-yellow-400');
-                            scheduleTimer = setInterval(() => {
-                                scheduleTime--;
-                                if (scheduleTime <= 0) {
-                                    ui.scheduleTime.innerText = "VERSPÄTET";
-                                    ui.scheduleTime.classList.add('text-red-500');
-                                    ui.scheduleTime.classList.remove('text-yellow-400');
-                                    clearInterval(scheduleTimer);
-                                    scheduleTimer = null;
-                                }
-                            }, 1000);
-                        } else {
-                            ui.scheduleDisplay.classList.add('hidden');
-                        }
-
-
-                        // --- Gemeinsame abschließende Schritte ---
-                        doorsOpen = false;
-                        applyUpgrades();
-
-                        // UI-Elemente aktualisieren
-                        ui.throttleSlider.value = window.throttle * 100;
-                        ui.throttleValue.innerText = `${Math.round(window.throttle * 100)}%`;
-                        ui.brakeSlider.value = window.brake * 100;
-                        ui.brakeValue.innerText = `${Math.round(window.brake * 100)}%`;
-                        updateDoorButton();
-
-                        console.log('Spielstand geladen!');
-
-                        // Ladevorgang abgeschlossen
-                        ui.loadingScreen.style.display = 'none';
-                        isPaused = false; // Spiel fortsetzen
-                        clock.start();
-
-
-                    } catch (error) {
-                        console.error('Fehler im asynchronen Lade-Teil:', error);
-                        ui.loadingScreen.style.display = 'none';
-                        // Spiel im Zweifel fortsetzen, um nicht stecken zu bleiben
-                        isPaused = false;
-                        clock.start();
-                    }
-
-                }, 50); // 50ms Timeout, damit der Browser den Ladebildschirm rendern kann
-
-            } catch (error) {
-                console.error('Fehler beim Initialisieren des Ladevorgangs:', error);
-                ui.loadingScreen.style.display = 'none'; // Ladebildschirm im Fehlerfall ausblenden
-                 if (isPaused) { // Wenn pausiert, wieder fortsetzen, um nicht stecken zu bleiben
-                    isPaused = false;
-                    clock.start();
-                }
-            }
-        }
-
-        function togglePause() {
-            isPaused = !isPaused;
-
-            if (isPaused) {
-                clock.stop();
-                ui.pauseMenu.classList.remove('hidden');
-                ui.pauseMenu.classList.add('flex');
-
-                // When pausing via standard methods, always show the main menu and hide the upgrade menu.
-                ui.upgradeMenu.classList.add('hidden');
-                ui.mainPauseMenu.classList.remove('hidden');
-                // No need to update upgrade UI here, only when opening it.
-
-                if (audioStarted) {
-                    if (Tone.Transport.state !== 'paused') Tone.Transport.pause();
-                    // Stoppe Sounds, die aktiv sein könnten
-                    if (engineSound && engineSound.state === "started") {
-                        engineSound.volume.rampTo(-Infinity, 0.1);
-                    }
-                    if (brakeSound && brakeSound.state !== "stopped") {
-                        brakeSound.triggerRelease(Tone.now());
-                    }
-                }
-            } else {
-                clock.start();
-                if (audioStarted) {
-                    if (Tone.Transport.state !== 'started') Tone.Transport.start();
-                }
-                ui.pauseMenu.classList.add('hidden');
-                ui.pauseMenu.classList.remove('flex');
-            }
-        }
-
-        // --- Game Loop ---
-        function animate() {
-            requestAnimationFrame(animate);
-            // stats.begin(); // Entfernt
-            
-            if (isPaused) {
-                // Im pausierten Zustand nichts tun, außer Rendern, um das Menü anzuzeigen
-                // renderer.render(scene, camera);
-                if (composer) composer.render();
-                return;
-            }
-
-            const dt = clock.getDelta();
-
-            updatePeopleAnimation(dt);
-            updatePhysics(dt);
-            updateCameraPosition();
-            updateDust();
-            checkSignalStatus();
-            checkStationStatus();
-            updateUI();
-
-            // renderer.render(scene, camera);
-            if (composer) composer.render();
-            
-            // stats.end(); // Entfernt
-        }
-
-        // --- Physik-Update & Sound ---
-        let lastAccelerationFactor = 0; 
-        function updatePhysics(dt) {
-            if (!trackCurve || dt === 0 || isPaused) return;
-
-            const oldSpeed = window.playerSpeed;
-
-            // 1. Kräfte berechnen
-            const t = playerDistance / totalTrackLength;
-            const tangent = trackCurve.getTangentAt(t);
-            const incline = tangent.y; 
-
-            const gravityComponent = MASS * GRAVITY * incline; 
-            let throttleForce = window.throttle * MAX_THROTTLE_FORCE;
-            let brakeForce = window.brake * MAX_BRAKE_FORCE;
-            const frictionForce = window.playerSpeed * FRICTION_COEFFICIENT + window.playerSpeed * window.playerSpeed * 10;
-
-            if (doorsOpen) {
-                throttleForce = 0;
-                brakeForce = MAX_BRAKE_FORCE * 1.5; 
-                window.throttle = 0;
-                ui.throttleSlider.value = 0;
-            }
-
-            const totalForce = throttleForce - brakeForce - frictionForce - gravityComponent; 
-            const calculatedAcceleration = totalForce / MASS;
-            
-            // 2. Geschwindigkeit und Distanz aktualisieren
-            window.playerSpeed += calculatedAcceleration * dt;
-
-            // Verhindern, dass der Zug rückwärts rollt
-            if (window.playerSpeed < 0 && window.throttle === 0 && window.brake === 0) {
-                 if (window.playerSpeed < -0.1 || window.brake > 0) window.playerSpeed = 0;
-            } else if (window.playerSpeed < 0) {
-                window.playerSpeed = 0;
-            }
-            if (window.playerSpeed > MAX_SPEED) window.playerSpeed = MAX_SPEED;
-            
-            playerDistance += window.playerSpeed * dt;
-
-            if (playerDistance > totalTrackLength) playerDistance -= totalTrackLength;
-            if (playerDistance < 0) playerDistance += totalTrackLength;
-
-            // Distance Tracking for Achievements
-            const distanceMoved = window.playerSpeed * dt;
-            if (distanceMoved > 0) {
-                totalDistanceTraveled += distanceMoved;
-                updateAchievementProgress('distance', distanceMoved);
-            }
-
-            // --- Sound Steuerung ---
-            if (audioStarted) {
-                const now = Tone.now();
-                const minEngineFreq = 80;
-                const maxEngineFreq = 400;
-                const speedRatio = window.playerSpeed / MAX_SPEED;
-
-                // Tatsächliche Beschleunigung berechnen
-                const actualAcceleration = (window.playerSpeed - oldSpeed) / dt;
-
-                // --- Motorgeräusch ---
-                if (window.throttle > 0 && window.playerSpeed > 0.1) {
-                    // Beschleunigen oder Geschwindigkeit halten
-                    if (engineSound.state !== "started") {
-                        engineSound.start(now);
-                        engineSound.volume.value = -Infinity; // Start leise
-                    }
-                    const targetFreq = minEngineFreq + speedRatio * (maxEngineFreq - minEngineFreq);
-                    engineSound.frequency.rampTo(targetFreq, 0.1);
-
-                    // Lautstärke basierend auf Beschleunigung und Throttle
-                    const baseVolume = THREE.MathUtils.lerp(-40, -30, window.throttle);
-                    const accelerationFactor = THREE.MathUtils.clamp(actualAcceleration * 2.0, 0, 1);
-                    lastAccelerationFactor = THREE.MathUtils.lerp(lastAccelerationFactor, accelerationFactor, 0.1);
-                    const targetVolume = baseVolume + THREE.MathUtils.lerp(0, 15, lastAccelerationFactor);
-
-                    engineSound.volume.rampTo(targetVolume, 0.1);
-
-                } else {
-                     // Leerlauf oder Stillstand
-                     if (engineSound.state === "started") {
-                         const idleVolume = (window.playerSpeed > 0.1) ? -40 : -Infinity;
-                         engineSound.volume.rampTo(idleVolume, 0.5, now);
-                         engineSound.frequency.rampTo(minEngineFreq + speedRatio * 20, 0.5);
-                         if (window.playerSpeed < 0.1) {
-                            setTimeout(() => { if(window.playerSpeed < 0.1 && window.throttle === 0 && window.brake === 0) engineSound.stop() }, 500);
-                         }
-                         lastAccelerationFactor = 0;
-                     }
-                }
-
-                // --- Bremsgeräusch (Zustandsbasierte Logik) ---
-                const isBrakingThisFrame = window.brake > 0 && window.playerSpeed > 0.1;
-
-                if (isBrakingThisFrame && !wasBrakingLastFrame) {
-                    // Bremse wurde gerade aktiviert
-                    if (engineSound.state === "started") {
-                         engineSound.volume.rampTo(-Infinity, 0.5, now);
-                         setTimeout(() => { if (window.brake > 0) engineSound.stop() }, 500);
-                         lastAccelerationFactor = 0;
-                    }
-                    brakeSound.triggerAttack(now);
-                } else if (!isBrakingThisFrame && wasBrakingLastFrame) {
-                    // Bremse wurde gerade gelöst
-                    brakeSound.triggerRelease(now);
-                }
-
-                // Lautstärke anpassen, während gebremst wird
-                if (isBrakingThisFrame) {
-                    const targetBrakeVol = THREE.MathUtils.lerp(-30, -10, window.brake * speedRatio);
-                    brakeSound.volume.rampTo(targetBrakeVol, 0.05);
-                }
-                wasBrakingLastFrame = isBrakingThisFrame;
-
-
-                // --- Fahrgeräusch Steuerung ---
-                if (drivingSound && window.playerSpeed > 0.1) {
-                    // Lautstärke von -50dB (kaum hörbar) bis -30dB (deutlich)
-                    const targetVolume = THREE.MathUtils.lerp(-50, -30, speedRatio);
-                    drivingSound.volume.rampTo(targetVolume, 0.1);
-
-                    // Filterfrequenz von 200Hz (dumpf) bis 800Hz (heller)
-                    const targetFilterFreq = THREE.MathUtils.lerp(200, 800, speedRatio);
-                    drivingFilter.frequency.rampTo(targetFilterFreq, 0.1);
-                } else if (drivingSound) {
-                    // Bei Stillstand ausblenden
-                    drivingSound.volume.rampTo(-Infinity, 0.5);
-                }
-            }
-        }
-
-        // --- Kamera-Update ---
-        const _camUpGlobal = new THREE.Vector3(0, 1, 0); 
-        const _camTangent = new THREE.Vector3();
-        const _camBinormal = new THREE.Vector3();
-        const _camNormal = new THREE.Vector3();
-        const _camPos = new THREE.Vector3();
-        const _camLookAtTarget = new THREE.Vector3(); 
-        
-        function updateCameraPosition() {
-            if (!trackCurve) return;
-
-            const t = playerDistance / totalTrackLength;
-            const t_lookat = (playerDistance + 15) / totalTrackLength; 
-
-            trackCurve.getPointAt(t, _camPos);
-            trackCurve.getPointAt(t_lookat, _camLookAtTarget); 
-            
-            // Lokales Koordinatensystem der Strecke berechnen
-            trackCurve.getTangentAt(t, _camTangent);
-            _camBinormal.crossVectors(_camUpGlobal, _camTangent).normalize();
-            _camNormal.crossVectors(_camTangent, _camBinormal).normalize(); 
-            
-            const cameraOffsetY = 2.5;
-            camera.position.copy(_camPos).addScaledVector(_camNormal, cameraOffsetY);
-            
-            const lookDownOffset = -0.3; 
-             _camLookAtTarget.addScaledVector(_camNormal, lookDownOffset); 
-
-            // Camera Shake (Disabled per user request)
-            /*
-            const speedShake = Math.max(0, window.playerSpeed) * 0.002;
-            const shakeX = (Math.random() - 0.5) * speedShake;
-            const shakeY = (Math.random() - 0.5) * speedShake;
-            const shakeZ = (Math.random() - 0.5) * speedShake;
-            camera.position.add(new THREE.Vector3(shakeX, shakeY, shakeZ));
-            */
-
-            // Dynamischen Up-Vektor verwenden
-            camera.up.copy(_camNormal); 
-
-            camera.lookAt(_camLookAtTarget); 
-        }
-
-        function createDust() {
-            const particleCount = 1500;
-            const geometry = new THREE.BufferGeometry();
-            const positions = [];
-            // Initial distribution around (0,0,0)
-            for (let i = 0; i < particleCount; i++) {
-                positions.push((Math.random() - 0.5) * 60);
-                positions.push((Math.random() - 0.5) * 30);
-                positions.push((Math.random() - 0.5) * 60);
-            }
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-
-            // Weiche Partikel-Textur
-            const canvas = document.createElement('canvas');
-            canvas.width = 32; canvas.height = 32;
-            const ctx = canvas.getContext('2d');
-            const grad = ctx.createRadialGradient(16,16,0,16,16,16);
-            grad.addColorStop(0, 'rgba(255,255,255,1)');
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0,0,32,32);
-            const dustTexture = new THREE.CanvasTexture(canvas);
-
-            const material = new THREE.PointsMaterial({
-                color: 0xaaaaaa,
-                size: 0.05,
-                transparent: true,
-                opacity: 0.4,
-                map: dustTexture,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
-            });
-
-            dustParticles = new THREE.Points(geometry, material);
-            scene.add(dustParticles);
-        }
-
-        function updateDust() {
-            if (!dustParticles || !camera) return;
-            const positions = dustParticles.geometry.attributes.position.array;
-            const camPos = camera.position;
-            const range = 40;
-
-            for (let i = 0; i < positions.length; i += 3) {
-                // Wrap X
-                if (positions[i] < camPos.x - range) positions[i] += range * 2;
-                else if (positions[i] > camPos.x + range) positions[i] -= range * 2;
-
-                // Wrap Y
-                if (positions[i+1] < camPos.y - range) positions[i+1] += range * 2;
-                else if (positions[i+1] > camPos.y + range) positions[i+1] -= range * 2;
-
-                // Wrap Z
-                if (positions[i+2] < camPos.z - range) positions[i+2] += range * 2;
-                else if (positions[i+2] > camPos.z + range) positions[i+2] -= range * 2;
-            }
-            dustParticles.geometry.attributes.position.needsUpdate = true;
-        }
-
-        // --- Stations-Logik ---
-        function checkStationStatus() {
-            let wasAtStation = atStation;
-            atStation = false;
-            currentStation = null;
-            let minDistanceToStop = Infinity;
-            
-            let nextStation = null;
-            let minDistanceToNext = Infinity;
-
-            for (const station of stations) {
-                const distToStationCenter = station.distance - playerDistance;
-                const absDist = Math.abs(distToStationCenter);
-                
-                if (absDist < station.length / 2) {
-                    atStation = true;
-                    currentStation = station;
-                    minDistanceToStop = distToStationCenter;
-                    break; 
-                }
-                
-                let distToNext = distToStationCenter;
-                if (distToNext < 0) {
-                    distToNext += totalTrackLength;
-                }
-                
-                if (distToNext < minDistanceToNext) {
-                    minDistanceToNext = distToNext;
-                    nextStation = station;
-                }
-            }
-            
-            if (atStation) {
-                ui.nextStationName.innerText = currentStation.name;
-                ui.nextStationDistance.innerText = `STOP ${minDistanceToStop.toFixed(0)} m`;
-                
-                if (window.playerSpeed < 0.1) {
-                    if (currentStation && !currentStation.visited) {
-                        let bonus = 0;
-                        let message = `Angehalten in ${currentStation.name}. Öffne die Türen zum Ein- und Aussteigen.`;
-                        if (scheduleTimer) {
-                            clearInterval(scheduleTimer);
-                            scheduleTimer = null;
-                            ui.scheduleDisplay.classList.add('hidden');
-
-                            if (scheduleTime > 0) {
-                                bonus = Math.round(50 * scoreMultiplier);
-                                window.credits += bonus;
-                                message += `\nPünktlich! +${bonus} Bonus!`;
-                                updateAchievementProgress('punctual', 1);
-                            }
-                            scheduleTime = 0;
-                        }
-
-                        currentStation.visited = true;
-                        showRandomFact();
-
-                        const stationName = currentStation.name;
-                        ui.statusMessage.dataset.station = stationName;
-
-                        ui.statusMessage.innerText = message;
-                        ui.statusMessage.classList.remove('hidden', 'bg-blue-600');
-                        ui.statusMessage.classList.add('bg-green-500');
-
-                        // Nachricht nach 10 Sekunden ausblenden
-                        setTimeout(() => {
-                            // Nur ausblenden, wenn sich die Nachricht in der Zwischenzeit nicht geändert hat
-                            if (ui.statusMessage.dataset.station === stationName) {
-                                ui.statusMessage.classList.add('hidden');
-                                delete ui.statusMessage.dataset.station;
-                            }
-                        }, 10000);
-
-                    } else if (!wasAtStation) {
-                        // Zeige eine temporäre "Ankunft"-Nachricht an, wenn keine andere wichtige Nachricht angezeigt wird
-                        if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station && !ui.statusMessage.dataset.achievement) {
-                             delete ui.statusMessage.dataset.station; // Vorsichtshalber löschen
-                             ui.statusMessage.innerText = `Haltestelle: ${currentStation.name}`;
-                             ui.statusMessage.classList.remove('hidden', 'bg-green-500', 'bg-red-500');
-                             ui.statusMessage.classList.add('bg-blue-600');
-                        }
-                    }
-                } else {
-                    // Verstecke die Nachricht nur, wenn keine wichtige, zeitgesteuerte Nachricht aktiv ist
-                    if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station && !ui.statusMessage.dataset.achievement) {
-                        ui.statusMessage.classList.add('hidden');
-                    }
-                }
-
-            } else {
-                // Logik für das Verlassen einer Station
-                if (wasAtStation && previousStation) {
-                    if (!previousStation.visited) {
-                        const penalty = 100; // Penalty is not multiplied
-                        window.credits -= penalty;
-                        const stationName = previousStation.name;
-                        ui.statusMessage.dataset.station = stationName;
-                        ui.statusMessage.innerText = `Station ${stationName} verpasst! -${penalty} Credits`;
-                        ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
-                        ui.statusMessage.classList.add('bg-red-500');
-
-                        setTimeout(() => {
-                            if (ui.statusMessage.dataset.station === stationName) {
-                                ui.statusMessage.classList.add('hidden');
-                                delete ui.statusMessage.dataset.station;
-                            }
-                        }, 5000);
-                    }
-
-                    // Zeitplan für die nächste Station festlegen
-                    const distanceToNext = minDistanceToNext;
-                    const averageSpeed = 20; // m/s, ca. 72 km/h
-                    scheduleTime = Math.round(distanceToNext / averageSpeed);
-
-                    ui.scheduleDisplay.classList.remove('hidden');
-                    ui.scheduleTime.classList.remove('text-red-500');
-                    ui.scheduleTime.classList.add('text-yellow-400');
-
-
-                    if (scheduleTimer) clearInterval(scheduleTimer);
-                    scheduleTimer = setInterval(() => {
-                        scheduleTime--;
-                        if (scheduleTime <= 0) {
-                            ui.scheduleTime.innerText = "VERSPÄTET";
-                            ui.scheduleTime.classList.add('text-red-500');
-                            ui.scheduleTime.classList.remove('text-yellow-400');
-                            clearInterval(scheduleTimer);
-                            scheduleTimer = null;
-                        }
-                    }, 1000);
-
-                } else {
-                    // Verstecke die Nachricht nur, wenn keine wichtige, zeitgesteuerte Nachricht aktiv ist
-                    if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station && !ui.statusMessage.dataset.achievement) {
-                       ui.statusMessage.classList.add('hidden');
-                    }
-                }
-
-                if (nextStation) {
-                    ui.nextStationName.innerText = nextStation.name;
-                    ui.nextStationDistance.innerText = `${minDistanceToNext.toFixed(0)} m`;
-
-                    if (letzteAngesagteStation !== nextStation.name) {
-                        ansageNaechsteStation(nextStation.name);
-                        letzteAngesagteStation = nextStation.name;
-                    }
-                }
-            }
-
-            previousStation = currentStation;
-            updateDoorButton();
-        }
-
-        function checkSignalStatus() {
-            for (const signal of signals) {
-                if (signal.color === 'red' && !signal.pointsAwarded) {
-                    // Robuste Distanzberechnung mit Schleifenlogik
-                    let distToSignal = signal.distance - playerDistance;
-                    if (totalTrackLength > 0 && Math.abs(distToSignal) > totalTrackLength / 2) {
-                        if (distToSignal > 0) {
-                            distToSignal -= totalTrackLength;
-                        } else {
-                            distToSignal += totalTrackLength;
-                        }
-                    }
-
-                    // Fall 1: Spieler hält korrekt vor dem roten Signal an (mit kleiner Toleranz für Überschießen)
-                    if (distToSignal > -5 && distToSignal < 30) {
-                        if (window.playerSpeed < 0.1) {
-                            const credits = Math.round(100 * scoreMultiplier);
-                            window.credits += credits;
-                            signal.pointsAwarded = true; // Verhindert doppelte Punkte/Strafen
-
-                            const signalId = `signal-${signal.distance}`;
-                            ui.statusMessage.dataset.signal = signalId;
-                            ui.statusMessage.innerText = `An rotem Signal gehalten! +${credits} Credits`;
-                            ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-red-500');
-                            ui.statusMessage.classList.add('bg-green-500');
-
-                            // Starte den Timer, um das Signal auf Grün zu schalten
-                            setTimeout(() => {
-                                signal.color = 'green';
-                                updateSignalVisuals(signal);
-
-                                // Verstecke die "gehalten"-Nachricht, falls sie noch da ist
-                                if (ui.statusMessage.dataset.signal === signalId) {
-                                    ui.statusMessage.classList.add('hidden');
-                                    delete ui.statusMessage.dataset.signal;
-                                }
-                            }, 2000); // 2 Sekunden Verzögerung
-                        }
-                    }
-                    // Fall 2: Spieler überfährt das rote Signal deutlich
-                    // Die zusätzliche Bedingung (distToSignal > -50) verhindert eine fälschliche Strafe für weit entfernte
-                    // Signale, die durch die "wrap-around"-Distanzberechnung fälschlicherweise als "gerade passiert" interpretiert werden.
-                    else if (distToSignal < -5 && distToSignal > -50 && window.playerSpeed > 0.5) {
-                        const penalty = 100; // Penalty is not multiplied
-                        window.credits -= penalty;
-                        signal.pointsAwarded = true; // Verhindert weitere Strafen für dieses Signal
-
-                        const signalId = `signal-${signal.distance}`;
-                        ui.statusMessage.dataset.signal = signalId;
-                        ui.statusMessage.innerText = `Rotes Signal überfahren! -${penalty} Credits`;
-                        ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
-                        ui.statusMessage.classList.add('bg-red-500');
-
-                        setTimeout(() => {
-                            if (ui.statusMessage.dataset.signal === signalId) {
-                                ui.statusMessage.classList.add('hidden');
-                                delete ui.statusMessage.dataset.signal;
-                            }
-                        }, 5000);
-                    }
-                }
-            }
-        }
-        
-        // --- UI-Updates ---
-        function updateUI() {
-            ui.speedDisplay.innerText = (window.playerSpeed * 3.6).toFixed(0);
-            ui.creditsDisplay.innerText = window.credits;
-            ui.passengerDisplay.innerText = passengers;
-
-            if (scheduleTimer) {
-                const minutes = Math.floor(scheduleTime / 60);
-                const seconds = scheduleTime % 60;
-                ui.scheduleTime.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }
-        }
-
-        function ansageNaechsteStation(stationsname) {
-            if (!window.speechSynthesis || !audioStarted) return;
-
-            // Verhindert, dass Ansagen sich gegenseitig unterbrechen, falls eine vorherige noch läuft
-            if (window.speechSynthesis.speaking) {
-                return;
-            }
-
-            const ansage = new SpeechSynthesisUtterance(`Nächste Station: ${stationsname}`);
-            ansage.lang = 'de-DE';
-            ansage.rate = 0.9;
-            ansage.pitch = 1.1;
-            window.speechSynthesis.speak(ansage);
-        }
-        
-        function updateDoorButton() {
-            const canOpen = atStation && window.playerSpeed < 0.1;
-            const buttonDiv = ui.doorButton.children[0];
-            
-            if (doorsOpen) {
-                buttonDiv.classList.remove('bg-gray-700', 'opacity-50', 'cursor-not-allowed', 'bg-green-600');
-                buttonDiv.classList.add('bg-yellow-500');
-                ui.doorButton.disabled = false;
-            } else {
-                if (canOpen) {
-                    buttonDiv.classList.remove('bg-gray-700', 'opacity-50', 'cursor-not-allowed', 'bg-yellow-500');
-                    buttonDiv.classList.add('bg-green-600');
-                    ui.doorButton.disabled = false;
-                } else {
-                    buttonDiv.classList.remove('bg-green-600', 'bg-yellow-500');
-                    buttonDiv.classList.add('bg-gray-700', 'opacity-50', 'cursor-not-allowed');
-                    ui.doorButton.disabled = true;
-                }
-            }
-        }
-
-        // --- Fenster-Resize ---
-        function onWindowResize() {
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
-            if (composer) composer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // --- Start ---
-        init();
-
-        window.testShowFact = showRandomFact; // Temporärer Testhaken
-
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }, false);
     </script>
 </body>
+
 </html>
