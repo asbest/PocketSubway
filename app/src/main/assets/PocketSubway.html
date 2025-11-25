@@ -751,6 +751,11 @@
         const MAX_GRADE = 0.025; 
         const TUBE_SEGMENTS = 900;
 
+        // Bahnhof-Geometrie Konstanten
+        const STATION_PLATFORM_HEIGHT = 0.5;
+        const STATION_PLATFORM_OFFSET = 4.5;
+        const STATION_PLATFORM_WIDTH = 6.0;
+
         // DOM-Elemente
         const ui = {
             loadingScreen: document.getElementById('loading-screen'),
@@ -1694,9 +1699,6 @@
 
         // --- Bahnhöfe ---
         function createStations(curve) {
-            const platformHeight = 0.5;
-            const platformOffset = 4.5; 
-            const platformWidth = 6.0; 
             const stationWallHeight = 3.0; 
 
             const up = new THREE.Vector3(0, 1, 0);
@@ -1705,6 +1707,8 @@
             const pos = new THREE.Vector3();
             
             stations.forEach(station => {
+                station.people = []; // Array to hold animation data for each person
+
                 const t = station.distance / totalTrackLength;
                 curve.getPointAt(t, pos);
                 curve.getTangentAt(t, tangent);
@@ -1716,15 +1720,15 @@
                 trackGroup.add(stationGroup);
 
                 // 1. Plattform
-                const platformGeo = new THREE.BoxGeometry(platformWidth, 0.5, station.length); 
+                const platformGeo = new THREE.BoxGeometry(STATION_PLATFORM_WIDTH, 0.5, station.length);
                 const platformMeshLeft = new THREE.Mesh(platformGeo, stationFloorMaterial);
-                platformMeshLeft.position.set(platformOffset, platformHeight - 0.25, 0); 
+                platformMeshLeft.position.set(STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT - 0.25, 0);
                 platformMeshLeft.receiveShadow = true;
                 platformMeshLeft.castShadow = true;
                 stationGroup.add(platformMeshLeft);
 
                 const platformMeshRight = new THREE.Mesh(platformGeo, stationFloorMaterial);
-                platformMeshRight.position.set(-platformOffset, platformHeight - 0.25, 0); 
+                platformMeshRight.position.set(-STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT - 0.25, 0);
                 platformMeshRight.receiveShadow = true;
                 platformMeshRight.castShadow = true;
                 stationGroup.add(platformMeshRight);
@@ -1733,13 +1737,13 @@
                 const wallThickness = 0.5;
                 const wallGeo = new THREE.BoxGeometry(wallThickness, stationWallHeight, station.length); 
                 const wallMeshLeft = new THREE.Mesh(wallGeo, stationWallMaterial);
-                wallMeshLeft.position.set(platformOffset + platformWidth / 2 + wallThickness / 2, platformHeight + (stationWallHeight / 2) - 0.5, 0); 
+                wallMeshLeft.position.set(STATION_PLATFORM_OFFSET + STATION_PLATFORM_WIDTH / 2 + wallThickness / 2, STATION_PLATFORM_HEIGHT + (stationWallHeight / 2) - 0.5, 0);
                 wallMeshLeft.receiveShadow = true;
                 wallMeshLeft.castShadow = true;
                 stationGroup.add(wallMeshLeft);
 
                 const wallMeshRight = new THREE.Mesh(wallGeo, stationWallMaterial);
-                wallMeshRight.position.set(-(platformOffset + platformWidth / 2 + wallThickness / 2), platformHeight + (stationWallHeight / 2) - 0.5, 0); 
+                wallMeshRight.position.set(-(STATION_PLATFORM_OFFSET + STATION_PLATFORM_WIDTH / 2 + wallThickness / 2), STATION_PLATFORM_HEIGHT + (stationWallHeight / 2) - 0.5, 0);
                 wallMeshRight.receiveShadow = true;
                 wallMeshRight.castShadow = true;
                 stationGroup.add(wallMeshRight);
@@ -1760,34 +1764,34 @@
                 const textTexture = new THREE.CanvasTexture(canvas);
                 const textMaterial = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true });
                 const textPlane = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.5), textMaterial); 
-                textPlane.position.set(platformOffset + platformWidth / 2 + wallThickness / 2 - 0.01, platformHeight + 1.0, 0); 
+                textPlane.position.set(STATION_PLATFORM_OFFSET + STATION_PLATFORM_WIDTH / 2 + wallThickness / 2 - 0.01, STATION_PLATFORM_HEIGHT + 1.0, 0);
                 textPlane.rotation.y = -Math.PI / 2; 
                 stationGroup.add(textPlane);
                 
                 const textPlaneRight = textPlane.clone();
-                textPlaneRight.position.set(-(platformOffset + platformWidth / 2 + wallThickness / 2 - 0.01), platformHeight + 1.0, 0);
+                textPlaneRight.position.set(-(STATION_PLATFORM_OFFSET + STATION_PLATFORM_WIDTH / 2 + wallThickness / 2 - 0.01), STATION_PLATFORM_HEIGHT + 1.0, 0);
                 textPlaneRight.rotation.y = Math.PI / 2; 
                 stationGroup.add(textPlaneRight);
 
 
                 // 5. Bahnhofsbeleuchtung
                 const stationLight1 = new THREE.PointLight(0xffffee, 0.2, 120, 2);
-                stationLight1.position.set(platformOffset, platformHeight + stationWallHeight - 0.5, -station.length / 4); 
+                stationLight1.position.set(STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, -station.length / 4);
                 stationLight1.isStationLight = true; 
                 stationGroup.add(stationLight1);
 
                 const stationLight2 = stationLight1.clone();
-                stationLight2.position.set(platformOffset, platformHeight + stationWallHeight - 0.5, station.length / 4);
+                stationLight2.position.set(STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, station.length / 4);
                 stationLight2.isStationLight = true;
                 stationGroup.add(stationLight2);
                 
                 const stationLight3 = stationLight1.clone();
-                stationLight3.position.set(-platformOffset, platformHeight + stationWallHeight - 0.5, -station.length / 4);
+                stationLight3.position.set(-STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, -station.length / 4);
                 stationLight3.isStationLight = true;
                 stationGroup.add(stationLight3);
 
                 const stationLight4 = stationLight1.clone();
-                stationLight4.position.set(-platformOffset, platformHeight + stationWallHeight - 0.5, station.length / 4);
+                stationLight4.position.set(-STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, station.length / 4);
                 stationLight4.isStationLight = true;
                 stationGroup.add(stationLight4);
 
@@ -1842,12 +1846,16 @@
                 const dummy = new THREE.Object3D();
                 const tempMatrix = new THREE.Matrix4();
 
-                const minXRelativeFromEdge = 0.3; 
-                const maxXRelativeFromEdge = 1.0; 
-                const minXRelative = -platformWidth / 2 + minXRelativeFromEdge; 
-                const maxXRelative = -platformWidth / 2 + maxXRelativeFromEdge; 
+                const minXRelativeFromEdge = 0.3;
+                const maxXRelativeFromEdge = 2.5; // Walk further from the edge
+                const minXRelative = -STATION_PLATFORM_WIDTH / 2 + minXRelativeFromEdge;
+                const maxXRelative = -STATION_PLATFORM_WIDTH / 2 + maxXRelativeFromEdge;
                 const minZRelative = -station.length / 2 + 2;
                 const maxZRelative = station.length / 2 - 2;
+
+                // References to all meshes for easier access in the animation loop
+                station.bodyMeshes = { headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh };
+
 
                 for (let i = 0; i < totalPeople; i++) {
                     // Farben pro Instanz
@@ -1855,7 +1863,7 @@
                     const shirtColor = shirtColors[Math.floor(Math.random() * shirtColors.length)];
                     const pantsColor = pantsColors[Math.floor(Math.random() * pantsColors.length)];
                     const hairColor = hairColors[Math.floor(Math.random() * hairColors.length)];
-                    
+
                     headMesh.setColorAt(i, skinColor);
                     armLeftMesh.setColorAt(i, skinColor);
                     armRightMesh.setColorAt(i, skinColor);
@@ -1868,14 +1876,29 @@
                     const onLeftSide = i < numPeoplePerSide;
                     const randomXRelative = Math.random() * (maxXRelative - minXRelative) + minXRelative;
                     const randomZRelative = Math.random() * (maxZRelative - minZRelative) + minZRelative;
-                    
-                    dummy.position.set(
-                        onLeftSide ? platformOffset + randomXRelative : -(platformOffset + randomXRelative),
-                        platformHeight,
+
+                    const personPosition = new THREE.Vector3(
+                        onLeftSide ? STATION_PLATFORM_OFFSET + randomXRelative : -(STATION_PLATFORM_OFFSET + randomXRelative),
+                        STATION_PLATFORM_HEIGHT,
                         randomZRelative
                     );
+                    dummy.position.copy(personPosition);
                     dummy.rotation.y = Math.random() * Math.PI * 2;
                     dummy.updateMatrix();
+
+                    // Store animation data
+                    station.people.push({
+                        id: i,
+                        position: personPosition,
+                        target: new THREE.Vector3(
+                            onLeftSide ? STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative) : -(STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative)),
+                            STATION_PLATFORM_HEIGHT,
+                            Math.random() * (maxZRelative - minZRelative) + minZRelative
+                        ),
+                        speed: 0.5 + Math.random() * 0.5, // m/s
+                        rotation: new THREE.Quaternion().setFromEuler(dummy.rotation)
+                    });
+
 
                     // Anwenden der Transformation auf jeden Körperteil mit seiner relativen Position
                     const setPartMatrix = (mesh, x, y, z, rotX = 0, rotY = 0, rotZ = 0) => {
@@ -1922,6 +1945,89 @@
                 mouthMesh.instanceMatrix.needsUpdate = true;
             });
         }
+
+        // --- Animation-related temporary variables to avoid allocations in the loop ---
+        const _personTargetDirection = new THREE.Vector3();
+        const _personRotationQuaternion = new THREE.Quaternion();
+        const _personLookAtMatrix = new THREE.Matrix4();
+        const _personMatrix = new THREE.Matrix4();
+        const _partDummy = new THREE.Object3D();
+        const _finalPartMatrix = new THREE.Matrix4();
+        const _upVector = new THREE.Vector3(0, 1, 0);
+        const _scaleVector = new THREE.Vector3(1, 1, 1);
+
+
+        function updatePeopleAnimation(dt) {
+            const minXRelativeFromEdge = 0.3;
+            const maxXRelativeFromEdge = 2.5;
+
+            for (const station of stations) {
+                if (!station.people || !station.bodyMeshes) continue;
+
+                const minZRelative = -station.length / 2 + 2;
+                const maxZRelative = station.length / 2 - 2;
+                const minXRelative = -STATION_PLATFORM_WIDTH / 2 + minXRelativeFromEdge;
+                const maxXRelative = -STATION_PLATFORM_WIDTH / 2 + maxXRelativeFromEdge;
+
+                for (const person of station.people) {
+                    // 1. Check if target is reached and set a new one
+                    if (person.position.distanceTo(person.target) < 0.5) {
+                        const onLeftSide = person.position.x > 0;
+                        person.target.set(
+                           onLeftSide ? STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative) : -(STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative)),
+                           person.position.y,
+                           Math.random() * (maxZRelative - minZRelative) + minZRelative
+                        );
+                    }
+
+                    // 2. Smoothly rotate towards the target
+                    _personLookAtMatrix.lookAt(person.target, person.position, _upVector);
+                    _personRotationQuaternion.setFromRotationMatrix(_personLookAtMatrix);
+                    person.rotation.slerp(_personRotationQuaternion, dt * 2.0);
+
+                    // 3. Move towards the target
+                    _personTargetDirection.subVectors(person.target, person.position).normalize();
+                    person.position.addScaledVector(_personTargetDirection, person.speed * dt);
+
+                    // 4. Update the main transformation matrix for this person's instance
+                    _personMatrix.compose(person.position, person.rotation, _scaleVector);
+
+                    // 5. Apply this transformation to all body part instances
+                    const { headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh } = station.bodyMeshes;
+
+                    // --- Procedural Walk Cycle ---
+                    const walkCycle = Math.sin(clock.elapsedTime * person.speed * 5);
+                    const walkAngle = walkCycle * 0.4; // 0.4 radians amplitude
+
+                    const setPartMatrix = (mesh, x, y, z, rotX = 0, rotY = 0, rotZ = 0) => {
+                        _partDummy.position.set(x, y, z);
+                        _partDummy.rotation.set(rotX, rotY, rotZ);
+                        _partDummy.updateMatrix();
+                        _finalPartMatrix.multiplyMatrices(_personMatrix, _partDummy.matrix);
+                        mesh.setMatrixAt(person.id, _finalPartMatrix);
+                    };
+
+                    setPartMatrix(headMesh, 0, 1.6, 0);
+                    setPartMatrix(torsoMesh, 0, 1.15, 0);
+                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, walkAngle, 0, 0.15);
+                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, -walkAngle, 0, -0.15);
+                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0, -walkAngle, 0, 0);
+                    setPartMatrix(legRightMesh, 0.12, 0.45, 0, walkAngle, 0, 0);
+                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05, -walkAngle, 0, 0);
+                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05, walkAngle, 0, 0);
+                    setPartMatrix(hairMesh, 0, 1.7, 0);
+                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15);
+                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15);
+                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, Math.PI / 2, -Math.PI / 2, 0);
+                }
+
+                // After updating all matrices for this station, flag them for update
+                for (const mesh of Object.values(station.bodyMeshes)) {
+                    mesh.instanceMatrix.needsUpdate = true;
+                }
+            }
+        }
+
 
         function createSignals(curve) {
             if (signals.length === 0) return;
@@ -2697,6 +2803,7 @@
 
             const dt = clock.getDelta();
 
+            updatePeopleAnimation(dt);
             updatePhysics(dt);
             updateCameraPosition();
             updateDust();
