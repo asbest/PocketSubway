@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -53,7 +53,7 @@
             margin: 0;
             overflow: hidden;
             background-color: #000;
-            cursor: pointer; /* Zeigt an, dass Klick erwartet wird */
+            cursor: pointer; /* Indicates that click is expected */
         }
         #canvas-container {
             position: fixed;
@@ -62,7 +62,7 @@
             width: 100%;
             height: 100%;
         }
-        /* Vertikale Slider für Steuerung */
+        /* Vertical sliders for controls */
         input[type=range][orient=vertical] {
             writing-mode: bt-lr; /* IE */
             -webkit-appearance: slider-vertical; /* WebKit */
@@ -76,7 +76,7 @@
             top: 8px !important;
             z-index: 100;
         }
-        /* Hinweis zum Starten des Audios */
+        /* Prompt to start audio */
         #audio-start-prompt {
             position: fixed;
             inset: 0;
@@ -100,36 +100,36 @@
     <div id="loading-screen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="text-center">
             <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-            <p class="text-xl mt-4">Generiere Strecke...</p>
-            <p class="text-sm text-gray-400">Das kann einen Moment dauern.</p>
+            <p class="text-xl mt-4">Generating track...</p>
+            <p class="text-sm text-gray-400">This may take a moment.</p>
         </div>
     </div>
 
     <div id="pause-menu" class="fixed inset-0 bg-black bg-opacity-40 flex-col items-center justify-center z-40 hidden">
         <div id="main-pause-menu">
-            <h1 class="text-6xl font-bold mb-8 text-center">PAUSE</h1>
+            <h1 class="text-6xl font-bold mb-8 text-center">PAUSED</h1>
             <div class="flex flex-col space-y-4">
                 <button id="resume-button" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Weiter
+                    Resume
                 </button>
                 <button id="save-button" class="bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Spiel speichern
+                    Save Game
                 </button>
                 <button id="load-button" class="bg-yellow-500 hover:bg-yellow-400 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Spiel laden
+                    Load Game
                 </button>
                 <button id="restart-button" class="bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Neustart
+                    Restart
                 </button>
                 <button id="achievements-button" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Tägliche Aufgaben
+                    Daily Tasks
                 </button>
 
-                <!-- Einstellungen -->
+                <!-- Settings -->
                 <div class="flex space-x-8 mt-8 justify-center">
                     <!-- Headlight Switch -->
                     <div class="flex flex-col items-center bg-gray-800 bg-opacity-80 p-4 rounded-lg text-white">
-                        <span class="text-lg font-bold mb-2">Scheinwerfer</span>
+                        <span class="text-lg font-bold mb-2">Headlight</span>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="headlight-toggle" class="sr-only peer" checked>
                             <div class="w-14 h-7 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
@@ -154,60 +154,60 @@
                 <!-- Upgrade Item -->
                 <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
                     <div>
-                        <h3 class="text-xl font-bold">Bessere Beschleunigung</h3>
-                        <p class="text-sm text-gray-400">Erhöht die Kraft des Antriebs.</p>
+                        <h3 class="text-xl font-bold">Better Acceleration</h3>
+                        <p class="text-sm text-gray-400">Increases engine power.</p>
                     </div>
                     <div class="text-right">
                         <p class="text-lg font-mono">Level <span id="acceleration-level">1</span></p>
-                        <button id="buy-acceleration" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Kaufen: 150 C</button>
+                        <button id="buy-acceleration" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Buy: 150 C</button>
                     </div>
                 </div>
                  <!-- Upgrade Item -->
                 <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
                     <div>
-                        <h3 class="text-xl font-bold">Stärkere Bremsen</h3>
-                        <p class="text-sm text-gray-400">Verbessert die Bremsleistung.</p>
+                        <h3 class="text-xl font-bold">Stronger Brakes</h3>
+                        <p class="text-sm text-gray-400">Improves braking performance.</p>
                     </div>
                     <div class="text-right">
                         <p class="text-lg font-mono">Level <span id="braking-level">1</span></p>
-                        <button id="buy-braking" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Kaufen: 150 C</button>
+                        <button id="buy-braking" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="150">Buy: 150 C</button>
                     </div>
                 </div>
                 <!-- Upgrade Item -->
                 <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
                     <div>
-                        <h3 class="text-xl font-bold">Höchstgeschwindigkeit</h3>
-                        <p class="text-sm text-gray-400">Ermöglicht höhere Geschwindigkeiten.</p>
+                        <h3 class="text-xl font-bold">Top Speed</h3>
+                        <p class="text-sm text-gray-400">Allows for higher speeds.</p>
                     </div>
                      <div class="text-right">
                         <p class="text-lg font-mono">Level <span id="max-speed-level">1</span></p>
-                        <button id="buy-max-speed" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="250">Kaufen: 250 C</button>
+                        <button id="buy-max-speed" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="250">Buy: 250 C</button>
                     </div>
                 </div>
                  <!-- Upgrade Item -->
                 <div class="flex justify-between items-center bg-gray-800 p-4 rounded-md">
                     <div>
-                        <h3 class="text-xl font-bold">Einnahme-Multiplikator</h3>
-                        <p class="text-sm text-gray-400">Erhöht alle erhaltenen Einnahmen.</p>
+                        <h3 class="text-xl font-bold">Income Multiplier</h3>
+                        <p class="text-sm text-gray-400">Increases all earnings.</p>
                     </div>
                     <div class="text-right">
                         <p class="text-lg font-mono">Level <span id="score-multiplier-level">1</span></p>
-                        <button id="buy-score-multiplier" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="500">Kaufen: 500 C</button>
+                        <button id="buy-score-multiplier" class="bg-blue-500 hover:bg-blue-400 text-white font-bold py-2 px-4 rounded transition-colors" data-cost="500">Buy: 500 C</button>
                     </div>
                 </div>
             </div>
             <button id="close-upgrade-menu-button" class="mt-8 bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 px-6 rounded-lg text-xl">
-                Weiter
+                Continue
             </button>
         </div>
 
         <div id="achievements-menu" class="hidden w-full max-w-4xl mx-auto">
-            <h1 class="text-6xl font-bold mb-8 text-center">TÄGLICHE AUFGABEN</h1>
+            <h1 class="text-6xl font-bold mb-8 text-center">DAILY TASKS</h1>
             <div id="achievements-list" class="bg-black bg-opacity-50 p-6 rounded-lg space-y-4">
                 <!-- Dynamically populated -->
             </div>
             <button id="close-achievements-menu-button" class="mt-8 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-lg text-xl">
-                Zurück
+                Back
             </button>
         </div>
     </div>
@@ -216,12 +216,12 @@
         
         <div class="w-full flex justify-between items-start text-sm">
             <div class="bg-black bg-opacity-40 p-2 rounded-lg shadow-lg">
-                <h2 class="text-xs font-semibold text-gray-400">NÄCHSTE HALTESTELLE</h2>
-                <p id="next-station-name" class="text-lg font-bold">Hauptbahnhof</p>
+                <h2 class="text-xs font-semibold text-gray-400">NEXT STATION</h2>
+                <p id="next-station-name" class="text-lg font-bold">Central Station</p>
                 <p id="next-station-distance" class="text-base font-mono">1500 m</p>
             </div>
             <div id="schedule-display" class="bg-black bg-opacity-40 p-2 rounded-lg shadow-lg text-center hidden">
-                <h2 class="text-xs font-semibold text-gray-400">FAHRPLAN</h2>
+                <h2 class="text-xs font-semibold text-gray-400">SCHEDULE</h2>
                 <p id="schedule-time" class="text-lg font-bold font-mono text-yellow-400">02:30</p>
             </div>
             
@@ -235,14 +235,14 @@
                             </div>
 
                              <div>
-                                <h2 class="text-[10px] font-semibold text-gray-400">PASSAGIERE</h2>
+                                <h2 class="text-[10px] font-semibold text-gray-400">PASSENGERS</h2>
                                 <p id="passenger-display" class="text-lg font-bold font-mono">0</p>
                             </div>
 
                         </div>
                     </div>
                     <div class="bg-black bg-opacity-40 p-1.5 rounded-lg shadow-lg text-right">
-                        <h2 class="text-[10px] font-semibold text-gray-400">GESCHWINDIGKEIT</h2>
+                        <h2 class="text-[10px] font-semibold text-gray-400">SPEED</h2>
                         <p id="speed-display" class="text-lg font-bold font-mono">0</p>
                         <p class="text-xs text-gray-300">km/h</p>
                     </div>
@@ -266,12 +266,12 @@
             
             <div class="flex space-x-4 bg-black bg-opacity-40 p-2 rounded-lg shadow-lg items-end">
                 <div class="flex flex-col items-center">
-                    <label for="throttle" class="text-xs font-semibold text-green-400">SCHUB</label>
+                    <label for="throttle" class="text-xs font-semibold text-green-400">THROTTLE</label>
                     <input type="range" id="throttle" orient="vertical" min="0" max="100" value="0" class="mt-1 h-24 md:h-32 accent-green-500">
                     <span id="throttle-value" class="font-mono text-sm mt-1">0%</span>
                 </div>
                 <div class="flex flex-col items-center">
-                    <label for="brake" class="text-xs font-semibold text-red-400">BREMSE</label>
+                    <label for="brake" class="text-xs font-semibold text-red-400">BRAKE</label>
                     <input type="range" id="brake" orient="vertical" min="0" max="100" value="0" class="mt-1 h-24 md:h-32 accent-red-500">
                     <span id="brake-value" class="font-mono text-sm mt-1">0%</span>
                 </div>
@@ -279,7 +279,7 @@
 
             <div class="flex flex-col items-end space-y-4">
                 <div id="status-message" class="bg-blue-600 bg-opacity-80 p-3 rounded-lg shadow-lg text-base font-semibold text-center hidden" style="min-width: 250px;">
-                    An Haltestelle angehalten.
+                    Stopped at station.
                 </div>
 
                 <button id="door-button" class="w-full" disabled>
@@ -534,12 +534,12 @@
         }
 
         function generateFunnyStationName() {
-            const prefixes = ['Groß', 'Klein', 'Alt', 'Neu', 'Ober', 'Unter', 'Bad', 'Sankt', 'Prost'];
-            const middles = ['Kicher', 'Enten', 'Gänse', 'Frosch', 'Mäuse', 'Katzen', 'Hunde', 'Brumm', 'Donner', 'Nebel', 'Schatten'];
-            const suffixes = ['bach', 'hausen', 'tal', 'berg', 'dorf', 'stadt', 'burg', 'moor', 'wald', 'hafen', 'brück'];
+            const prefixes = ['Great', 'Little', 'Old', 'New', 'Upper', 'Lower', 'Bad', 'Saint', 'Port'];
+            const middles = ['Giggle', 'Duck', 'Goose', 'Frog', 'Mouse', 'Cat', 'Dog', 'Bear', 'Thunder', 'Mist', 'Shadow'];
+            const suffixes = ['brook', 'ville', 'dale', 'hill', 'dorf', 'town', 'burg', 'moor', 'wood', 'haven', 'bridge'];
 
-            const hasPrefix = Math.random() > 0.3; // 70% Wahrscheinlichkeit für ein Präfix
-            const prefix = hasPrefix ? prefixes[Math.floor(Math.random() * prefixes.length)] + '-' : '';
+            const hasPrefix = Math.random() > 0.3; // 70% chance for a prefix
+            const prefix = hasPrefix ? prefixes[Math.floor(Math.random() * prefixes.length)] + ' ' : '';
             const middle = middles[Math.floor(Math.random() * middles.length)];
             const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
 
@@ -547,111 +547,111 @@
         }
 
         const subwayFacts = [
-            "Die erste U-Bahn der Welt fuhr am 10. Januar 1863 in London.",
-            "Die Londoner U-Bahn wird liebevoll 'The Tube' (Die Röhre) genannt.",
-            "Das U-Bahn-Netz von Shanghai ist das größte der Welt mit über 800 km Streckenlänge.",
-            "Nur 45% des Londoner U-Bahn-Netzes verläuft tatsächlich unterirdisch.",
-            "Die tiefste U-Bahn-Station der Welt ist Arsenalna in Kiew, 105,5 Meter unter der Oberfläche.",
-            "Die U-Bahn von Stockholm wird oft als die längste Kunstgalerie der Welt bezeichnet, da über 90 der 100 Stationen dekoriert sind.",
-            "In der Moskauer U-Bahn gibt es eine Ringlinie, auf der die Ansagen im Uhrzeigersinn von einer männlichen und gegen den Uhrzeigersinn von einer weiblichen Stimme gesprochen werden.",
-            "Während des Zweiten Weltkriegs wurden viele Londoner U-Bahn-Stationen als Luftschutzbunker genutzt.",
-            "Die New Yorker U-Bahn ist eines der wenigen 24-Stunden-Systeme der Welt.",
-            "In der U-Bahn von Toronto gibt es eine 'Geisterstation' namens Lower Bay, die für Filmaufnahmen genutzt wird.",
-            "Die U-Bahn in Pjöngjang, Nordkorea, liegt so tief, dass sie auch als Atomschutzbunker dient. Ausgemusterte Berliner U-Bahn-Wagen sind dort noch im Einsatz.",
-            "Einige Züge verfügen über Sandstreuer, um bei rutschigen Schienen (z.B. durch Laub) die Reibung zu erhöhen.",
-            "Weichen sind oft beheizt, damit sie im Winter nicht einfrieren und funktionsfähig bleiben.",
-            "Das 'U' in U-Bahn steht ursprünglich für 'unabhängig', da die Bahn auf einem vom restlichen Verkehr getrennten Schienennetz fährt.",
-            "In vielen Bahnhöfen sind metallbeschichtete Luftballons verboten, da sie Kurzschlüsse in den Oberleitungen verursachen können.",
-            "In den Tunneln der Londoner U-Bahn lebt eine eigene Mückenart, die sich an das unterirdische Leben angepasst hat.",
-            "Die kürzeste U-Bahn-Linie der Welt ist die 'Tünel' in Istanbul, die nur 573 Meter lang ist.",
-            "Die Pariser Métro hat so viele Stationen, dass man von keinem Punkt in der Stadt mehr als 500 Meter zur nächsten Station laufen muss.",
-            "Die U-Bahn von Mexiko-Stadt fährt auf Gummireifen statt auf Stahlrädern, was für eine ruhigere Fahrt sorgt.",
-            "In der U-Bahn von Helsinki können Fahrgäste in einer speziellen Sauna-Gondel fahren.",
-            "Der U-Bahnhof Hermannplatz in Berlin war der erste, der mit einer Rolltreppe ausgestattet wurde.",
-            "Der Geruch der Londoner U-Bahn ist so einzigartig, dass er 2001 als Markenzeichen geschützt werden sollte.",
-            "Die Berliner U-Bahn hat zwei verschiedene Profile: Kleinprofil (U1-U4) und Großprofil (U5-U9) mit unterschiedlich breiten Zügen.",
-            "Einige Stationen der Münchner U-Bahn wurden von bekannten Künstlern wie Joseph Beuys gestaltet.",
-            "Die U-Bahn in Dubai ist komplett fahrerlos und wird von einem zentralen System gesteuert.",
-            "Die schnellste U-Bahn der Welt ist der Maglev in Shanghai, der Geschwindigkeiten von bis zu 431 km/h erreicht.",
-            "In der U-Bahn von Kairo gibt es separate Wagen nur für Frauen.",
-            "Die erste U-Bahn auf dem afrikanischen Kontinent wurde 1987 in Kairo eröffnet.",
-            "Der U-Bahnhof Solna Centrum in Stockholm sieht aus wie eine feuerrote Höhle und soll die 'Tore zur Hölle' darstellen.",
-            "Die U-Bahn von Buenos Aires hat noch historische Holzwagen aus den 1910er Jahren im Einsatz.",
-            "Die U-Bahn in Athen ist ein rollendes Museum. Beim Bau wurden so viele archäologische Schätze gefunden, dass viele Stationen sie ausstellen.",
-            "Es gibt eine unvollendete 'Geisterlinie' (U10) in Berlin, deren Tunnel teilweise für Veranstaltungen genutzt werden.",
-            "Die U-Bahn in Glasgow ist die drittälteste der Welt und hat eine kreisförmige Linie, die 'The Clockwork Orange' genannt wird.",
-            "Auf der U-Bahn-Linie 1 in New York gibt es eine vergessene Station namens 'City Hall Loop' mit beeindruckender Architektur, die man auf Sonderfahrten besichtigen kann.",
-            "Die U-Bahn in Santiago de Chile gilt als eine der modernsten und saubersten in Lateinamerika.",
-            "In der U-Bahn von Tokio gibt es Mitarbeiter (Oshiya), deren Aufgabe es ist, Fahrgäste in die vollen Züge zu schieben.",
-            "Die Station 'Canary Wharf' in London wurde in einem ehemaligen Hafenbecken gebaut und ist groß genug, um einen Wolkenkratzer liegend aufzunehmen.",
-            "Die U-Bahn von São Paulo befördert täglich über 4 Millionen Menschen und ist eines der verkehrsreichsten Netze der Welt.",
-            "Der U-Bahnhof 'Gare du Nord' in Paris ist der verkehrsreichste in Europa.",
-            "Die U-Bahn von Budapest ist die älteste elektrisch betriebene U-Bahn auf dem europäischen Festland (1896).",
-            "Einige Stationen der Moskauer U-Bahn sind so prunkvoll mit Marmor, Mosaiken und Kronleuchtern ausgestattet, dass sie 'unterirdische Paläste' genannt werden.",
-            "Die U-Bahn in Kopenhagen ist 24/7 in Betrieb und fährt fahrerlos.",
-            "Der längste U-Bahn-Tunnel der Welt ist der der Linie 3 in Guangzhou, China, mit einer Länge von 60,4 km.",
-            "Die U-Bahn von Taipeh (Taiwan) ist bekannt für ihre Sauberkeit und Pünktlichkeit.",
-            "In den Tunneln der U-Bahn von Singapur ist das Essen und Trinken von Durian-Früchten wegen ihres starken Geruchs streng verboten.",
-            "Die U-Bahn von Montreal hat wie die in Mexiko-Stadt Züge mit Gummireifen.",
-            "Die Station 'Westfriedhof' in München ist berühmt für ihre riesigen, farbigen Lampen, die eine einzigartige Atmosphäre schaffen.",
-            "Die U-Bahn in Washington D.C. ist bekannt für ihre beeindruckende, gewölbte Architektur aus Beton.",
-            "In der U-Bahn von Seoul sind die Sitze im Winter beheizt.",
-            "Die Linie 14 der Pariser Métro war die erste vollautomatische Linie der Stadt.",
-            "Die U-Bahn von Algier war die erste Metro im Maghreb.",
-            "Die 'Mail Rail' in London war eine fahrerlose Post-U-Bahn, die über 75 Jahre lang Briefe unter der Stadt transportierte und heute ein Museum ist.",
-            "Der U-Bahnhof 'Toledo' in Neapel wurde als schönster Europas ausgezeichnet und ist bekannt für sein beeindruckendes Lichtkunstwerk.",
-            "Die U-Bahn in Wien wird teilweise aus der Energie betrieben, die beim Bremsen der Züge zurückgewonnen wird (Rekuperation).",
-            "In einem U-Bahnhof in Berlin (Bülowstraße) gab es in den 70er Jahren einen Flohmarkt in einem stillgelegten Zug.",
-            "Die U-Bahn in Oslo fährt bis auf die Skipisten am Holmenkollen.",
-            "Die U-Bahn von Bilbao wurde vom berühmten Architekten Norman Foster entworfen und hat charakteristische Glaseingänge namens 'Fosteritos'.",
-            "Einige der Belüftungsgitter der New Yorker U-Bahn sind als kunstvolle Skulpturen getarnt.",
-            "Die U-Bahn von Vancouver (SkyTrain) ist eines der längsten vollautomatischen Nahverkehrssysteme der Welt.",
-            "Die U-Bahn von Bangkok hat spezielle Mönchssitze, die für buddhistische Mönche reserviert sind.",
-            "Die U-Bahn in Prag hat eine Station (Anděl), die mit Engeln und Teufeln dekoriert ist, ein Verweis auf den früheren Namen 'Moskevská'.",
-            "Die U-Bahn in Rotterdam hat einen oberirdischen Abschnitt, der durch ein Wohnhaus führt.",
-            "In der U-Bahn von Brüssel gibt es über 80 Kunstwerke, die in den Stationen permanent ausgestellt sind.",
-            "Die U-Bahn von Mailand ist bekannt für ihr klares und rationalistisches Design von Franco Albini und Bob Noorda.",
-            "Die U-Bahn in Warschau wurde erst 1995 eröffnet, obwohl die Planungen bereits in den 1920er Jahren begannen.",
-            "Die U-Bahn in Lissabon ist berühmt für ihre kunstvollen Kacheln (Azulejos) in den Stationen.",
-            "Die U-Bahn von Barcelona hat zwei verschiedene Spurweiten, was auf die unterschiedlichen Bahngesellschaften zurückgeht, die das Netz ursprünglich bauten.",
-            "Die U-Bahn in Jekaterinburg ist die kürzeste der Welt mit nur 7 Stationen.",
-            "Die U-Bahn in Mumbai wurde gebaut, um die notorisch überfüllten Vorortzüge zu entlasten.",
-            "Die U-Bahn in Teheran hat spezielle Waggons und Eingänge für Frauen, die getrennt reisen möchten.",
-            "Die U-Bahn in Kaohsiung (Taiwan) hat die größte Glasinstallation der Welt in der Station Formosa Boulevard.",
-            "Die U-Bahn in Hamburg (Hochbahn) fährt zu großen Teilen auf Viadukten und ist eine der ältesten in Deutschland.",
-            "Die U-Bahn in Nürnberg war die erste in Deutschland, die vollautomatisch fuhr.",
-            "Die U-Bahn von Rom ist relativ klein, da Bauarbeiten oft durch archäologische Funde verzögert werden.",
-            "Die U-Bahn in Amsterdam hat eine Linie, die unter dem Fluss IJ in einem Tunnel verläuft, der abgesenkt wurde.",
-            "Die U-Bahn in Los Angeles ist ein relativ junges System, das in einer Stadt gebaut wurde, die für ihre Autokultur bekannt ist.",
-            "Die U-Bahn in Kuala Lumpur hat die längste vollautomatische Linie der Welt.",
-            "Die U-Bahn in Kasan (Russland) hat Stationen, die nach berühmten tatarischen Dichtern und Schriftstellern benannt sind.",
-            "Die U-Bahn in Caracas (Venezuela) ist bekannt für ihre Kunstwerke und ihre Sauberkeit, trotz der wirtschaftlichen Schwierigkeiten des Landes.",
-            "Die U-Bahn in Lima (Peru) wurde in mehreren Phasen über einen Zeitraum von 30 Jahren gebaut.",
-            "Die U-Bahn in Incheon (Südkorea) ist mit der U-Bahn von Seoul verbunden und bildet eines der größten Metronetze der Welt.",
-            "Die U-Bahn in Palma de Mallorca ist eines der kleinsten Systeme in Europa und bedient hauptsächlich die Universität.",
-            "Die U-Bahn in Rennes (Frankreich) war eine der ersten vollautomatischen Metros der Welt (Typ VAL).",
-            "Die U-Bahn in Lausanne (Schweiz) ist eine der steilsten der Welt und überwindet erhebliche Höhenunterschiede.",
-            "Die U-Bahn in Brescia (Italien) ist wie Kopenhagen und Nürnberg fahrerlos.",
-            "Die U-Bahn in Thessaloniki wurde durch zahlreiche archäologische Funde aus der byzantinischen Zeit stark verzögert.",
-            "Die U-Bahn in Bangalore (Indien), auch 'Namma Metro' genannt, hat spezielle Waggons für Frauen und Kinder.",
-            "Die U-Bahn in Chennai (Indien) hat eine Mischung aus ober- und unterirdischen Strecken.",
-            "Die U-Bahn in Delhi ist eines der am schnellsten wachsenden Netze der Welt und verfügt über einen eigenen Flughafen-Express.",
-            "Die U-Bahn in Schiras (Iran) ist eine der neuesten im Nahen Osten.",
-            "Die U-Bahn in Ankara ist die zweitgrößte in der Türkei nach Istanbul.",
-            "Die U-Bahn in Izmir (Türkei) hat eine Linie, die entlang der Küste verläuft.",
-            "Die U-Bahn in Almaty (Kasachstan) ist bekannt für ihre kunstvollen Stationen, die die kasachische Kultur widerspiegeln.",
-            "Die U-Bahn in Taschkent (Usbekistan) war die erste in Zentralasien und ist für ihre einzigartige Architektur bekannt.",
-            "Die U-Bahn in Minsk (Belarus) hat Stationen, die im sowjetischen Stil dekoriert sind.",
-            "Die U-Bahn in Baku (Aserbaidschan) hat ein kompliziertes Liniensystem, bei dem sich mehrere Linien die gleichen Gleise teilen.",
-            "Die U-Bahn in Dnipro (Ukraine) hat nur eine Linie mit 6 Stationen.",
-            "Die U-Bahn in Catania (Italien) ist eine der kürzesten in Europa und hat oft mit Überschwemmungen durch den nahegelegenen Vulkan Ätna zu kämpfen.",
-            "Die U-Bahn in Genua (Italien) hat eine sehr ungewöhnliche Topographie mit vielen Aufzügen und Schrägaufzügen, um die hügelige Stadt zu erschließen.",
-            "Die U-Bahn in Neapel hat neben der berühmten Toledo-Station viele weitere 'Kunststationen'.",
-            "Die U-Bahn in Turin (Italien) war die erste vollautomatische in Italien.",
-            "Die U-Bahn in Helsinki ist die nördlichste der Welt.",
-            "Die U-Bahn von Maracaibo (Venezuela) ist eigentlich eine Stadtbahn, wird aber als Metro bezeichnet.",
-            "Die U-Bahn von Valencia (Spanien) ist eine Mischung aus U-Bahn und Straßenbahn.",
-            "Die U-Bahn in Chongqing (China) ist einzigartig, da sie durch ein 19-stöckiges Wohnhaus fährt, mit einer eigenen Station im Gebäude."
+            "The world's first underground railway opened in London on January 10, 1863.",
+            "The London Underground is affectionately called 'The Tube'.",
+            "Shanghai's metro network is the largest in the world with over 800 km of track.",
+            "Only 45% of the London Underground network is actually underground.",
+            "The world's deepest metro station is Arsenalna in Kyiv, 105.5 meters below the surface.",
+            "Stockholm's metro is often called the world's longest art gallery, with over 90 of its 100 stations decorated.",
+            "In the Moscow Metro, announcements on the ring line are made by a male voice when traveling clockwise, and a female voice when traveling counter-clockwise.",
+            "During World War II, many London Underground stations were used as air-raid shelters.",
+            "The New York City Subway is one of the few 24-hour systems in the world.",
+            "Toronto's subway has a 'ghost station' called Lower Bay, used for film sets.",
+            "Pyongyang's metro in North Korea is so deep it doubles as a nuclear bunker. Retired Berlin U-Bahn cars are still in use there.",
+            "Some trains have sanders to increase friction on slippery rails (e.g., due to leaves).",
+            "Switches are often heated to prevent freezing in winter.",
+            "The 'U' in U-Bahn stands for 'Untergrund' (Underground).",
+            "Metal-coated balloons are banned in many stations as they can cause short circuits in overhead lines.",
+            "A unique species of mosquito lives in the London Underground tunnels, adapted to subterranean life.",
+            "The world's shortest metro line is the 'Tünel' in Istanbul, only 573 meters long.",
+            "The Paris Métro has so many stations that you are never more than 500 meters from one anywhere in the city.",
+            "Mexico City's metro runs on rubber tires instead of steel wheels, making for a smoother ride.",
+            "In Helsinki's metro, passengers can ride in a special sauna gondola.",
+            "Hermannplatz station in Berlin was the first to be equipped with an escalator.",
+            "The smell of the London Underground is so unique that there was an attempt to trademark it in 2001.",
+            "The Berlin U-Bahn has two different profiles: Small profile (U1-U4) and Large profile (U5-U9) with trains of different widths.",
+            "Some Munich U-Bahn stations were designed by famous artists like Joseph Beuys.",
+            "The Dubai Metro is completely driverless and controlled by a central system.",
+            "The fastest train in the world is the Maglev in Shanghai, reaching speeds of up to 431 km/h.",
+            "Cairo's metro has separate cars reserved for women.",
+            "The first metro on the African continent opened in Cairo in 1987.",
+            "Solna Centrum station in Stockholm looks like a fiery red cave and is meant to represent the 'gates of hell'.",
+            "Buenos Aires' subway still has historic wooden cars from the 1910s in operation.",
+            "Athens' metro is a rolling museum. So many archaeological treasures were found during construction that many stations display them.",
+            "There is an unfinished 'ghost line' (U10) in Berlin, with tunnels partly used for events.",
+            "Glasgow's subway is the third oldest in the world and has a circular line called 'The Clockwork Orange'.",
+            "New York's line 1 has a forgotten station called 'City Hall Loop' with impressive architecture, visible on special tours.",
+            "Santiago de Chile's metro is considered one of the most modern and clean in Latin America.",
+            "In Tokyo's subway, there are staff (Oshiya) whose job is to push passengers into crowded trains.",
+            "Canary Wharf station in London was built in a former dock basin and is large enough to lay a skyscraper on its side inside it.",
+            "São Paulo's metro transports over 4 million people daily and is one of the busiest networks in the world.",
+            "Gare du Nord metro station in Paris is the busiest in Europe.",
+            "Budapest's metro is the oldest electrically operated underground railway on the European continent (1896).",
+            "Some Moscow Metro stations are so lavishly decorated with marble, mosaics, and chandeliers that they are called 'underground palaces'.",
+            "Copenhagen's metro operates 24/7 and is driverless.",
+            "The world's longest metro tunnel is on Line 3 in Guangzhou, China, at 60.4 km.",
+            "Taipei's metro (Taiwan) is known for its cleanliness and punctuality.",
+            "Eating or drinking durian fruit in Singapore's MRT tunnels is strictly forbidden due to the strong smell.",
+            "Montreal's metro, like Mexico City's, uses trains with rubber tires.",
+            "Westfriedhof station in Munich is famous for its huge, colored lamps creating a unique atmosphere.",
+            "Washington D.C.'s metro is known for its impressive vaulted concrete architecture.",
+            "Seoul's subway seats are heated in winter.",
+            "Line 14 of the Paris Métro was the city's first fully automatic line.",
+            "Algiers' metro was the first metro in the Maghreb.",
+            "London's 'Mail Rail' was a driverless postal subway that carried mail under the city for over 75 years and is now a museum.",
+            "Toledo station in Naples was awarded the title of most beautiful in Europe, known for its impressive light art.",
+            "Vienna's U-Bahn is partly powered by energy recovered from braking trains (recuperation).",
+            "In the 70s, there was a flea market in a decommissioned train at a Berlin U-Bahn station (Bülowstraße).",
+            "Oslo's metro runs right up to the ski slopes at Holmenkollen.",
+            "Bilbao's metro was designed by famous architect Norman Foster and has characteristic glass entrances called 'Fosteritos'.",
+            "Some ventilation grates of the New York subway are disguised as artistic sculptures.",
+            "Vancouver's SkyTrain is one of the longest fully automated rapid transit systems in the world.",
+            "Bangkok's metro has special seats reserved for Buddhist monks.",
+            "Prague's metro has a station (Anděl) decorated with angels and devils, a reference to its former name 'Moskevská'.",
+            "Rotterdam's metro has an above-ground section that runs through a residential building.",
+            "Brussels' metro has over 80 artworks permanently displayed in its stations.",
+            "Milan's metro is known for its clear and rationalist design by Franco Albini and Bob Noorda.",
+            "Warsaw's metro opened in 1995, although planning began in the 1920s.",
+            "Lisbon's metro is famous for its artistic tiles (Azulejos) in the stations.",
+            "Barcelona's metro has two different track gauges, dating back to the different companies that originally built the network.",
+            "Yekaterinburg's metro is the shortest in the world with only 7 stations.",
+            "Mumbai's metro was built to relieve the notoriously overcrowded suburban trains.",
+            "Tehran's metro has special cars and entrances for women who wish to travel separately.",
+            "Kaohsiung's metro (Taiwan) has the largest glass work in the world at Formosa Boulevard station.",
+            "Hamburg's U-Bahn (Hochbahn) runs largely on viaducts and is one of the oldest in Germany.",
+            "Nuremberg's U-Bahn was the first in Germany to operate fully automatically.",
+            "Rome's metro is relatively small as construction is often delayed by archaeological finds.",
+            "Amsterdam's metro has a line that runs under the river IJ in a tunnel that was sunk into place.",
+            "Los Angeles' metro is a relatively young system built in a city known for its car culture.",
+            "Kuala Lumpur's metro has the longest fully automated line in the world.",
+            "Kazan's metro (Russia) has stations named after famous Tatar poets and writers.",
+            "Caracas' metro (Venezuela) is known for its artwork and cleanliness, despite the country's economic difficulties.",
+            "Lima's metro (Peru) was built in several phases over a period of 30 years.",
+            "Incheon's subway (South Korea) is connected to Seoul's, forming one of the largest metro networks in the world.",
+            "Palma de Mallorca's metro is one of the smallest systems in Europe, mainly serving the university.",
+            "Rennes' metro (France) was one of the world's first fully automatic metros (VAL type).",
+            "Lausanne's metro (Switzerland) is one of the steepest in the world, overcoming significant height differences.",
+            "Brescia's metro (Italy) is driverless, like Copenhagen and Nuremberg.",
+            "Thessaloniki's metro was heavily delayed by numerous archaeological finds from the Byzantine era.",
+            "Bangalore's metro (India), also called 'Namma Metro', has special cars for women and children.",
+            "Chennai's metro (India) has a mix of elevated and underground tracks.",
+            "Delhi's metro is one of the fastest-growing networks in the world and has its own Airport Express.",
+            "Shiraz's metro (Iran) is one of the newest in the Middle East.",
+            "Ankara's metro is the second largest in Turkey after Istanbul.",
+            "Izmir's metro (Turkey) has a line running along the coast.",
+            "Almaty's metro (Kazakhstan) is known for its artistic stations reflecting Kazakh culture.",
+            "Tashkent's metro (Uzbekistan) was the first in Central Asia and is known for its unique architecture.",
+            "Minsk's metro (Belarus) has stations decorated in Soviet style.",
+            "Baku's metro (Azerbaijan) has a complicated line system where multiple lines share the same tracks.",
+            "Dnipro's metro (Ukraine) has only one line with 6 stations.",
+            "Catania's metro (Italy) is one of the shortest in Europe and often struggles with flooding from nearby Mount Etna.",
+            "Genoa's metro (Italy) has a very unusual topography with many elevators and funiculars to serve the hilly city.",
+            "Naples' metro has many other 'Art Stations' besides the famous Toledo station.",
+            "Turin's metro (Italy) was the first fully automatic one in Italy.",
+            "Helsinki's metro is the northernmost in the world.",
+            "Maracaibo's metro (Venezuela) is actually a light rail but is branded as a metro.",
+            "Valencia's metro (Spain) is a mix of metro and tram.",
+            "Chongqing's metro (China) is unique as it passes through a 19-story residential building, with its own station inside."
         ];
 
         let factTimeout;
@@ -2343,7 +2343,7 @@
             passengers -= arrivingPassengers;
             passengers += departingPassengers;
 
-            let message = `\n${arrivingPassengers} Passagiere ausgestiegen. +${income} Credits!`;
+            let message = `\n${arrivingPassengers} passengers disembarked. +${income} Credits!`;
 
             window.credits += income;
             currentStation.passengersExchanged = true; // Mark exchange as complete
@@ -2363,9 +2363,9 @@
                 dailyAchievements = {
                     date: today,
                     list: [
-                        { id: 'distance', description: 'Strecken-König: Fahre 5 km', target: 5000, current: 0, completed: false, reward: 500, unit: 'm' },
-                        { id: 'passengers', description: 'Menschenfreund: Befördere 50 Passagiere', target: 50, current: 0, completed: false, reward: 300, unit: 'Pax' },
-                        { id: 'punctual', description: 'Pünktlichkeits-Profi: 3 pünktliche Ankünfte', target: 3, current: 0, completed: false, reward: 400, unit: '' }
+                        { id: 'distance', description: 'Track King: Travel 5 km', target: 5000, current: 0, completed: false, reward: 500, unit: 'm' },
+                        { id: 'passengers', description: 'People Person: Transport 50 passengers', target: 50, current: 0, completed: false, reward: 300, unit: 'Pax' },
+                        { id: 'punctual', description: 'Punctuality Pro: 3 on-time arrivals', target: 3, current: 0, completed: false, reward: 400, unit: '' }
                     ]
                 };
                 totalDistanceTraveled = 0; // Reset daily distance tracking
@@ -2384,7 +2384,7 @@
                 window.credits += achievement.reward;
 
                 // Notification
-                const message = `Aufgabe erledigt: ${achievement.description.split(':')[0]}! +${achievement.reward} Credits`;
+                const message = `Task complete: ${achievement.description.split(':')[0]}! +${achievement.reward} Credits`;
                 // Wir nutzen ui.statusMessage kurz, falls sie nicht belegt ist, oder überschreiben sie
                  ui.statusMessage.dataset.achievement = id; // Prevent overwriting by loop
                  ui.statusMessage.innerText = message;
@@ -2415,7 +2415,7 @@
                 title.innerText = ach.description;
                 if (ach.completed) {
                     title.classList.add('text-green-500');
-                    title.innerText += ' (Erledigt)';
+                    title.innerText += ' (Done)';
                 }
 
                 const reward = document.createElement('div');
@@ -2471,10 +2471,10 @@
             ui.buyMaxSpeedButton.dataset.cost = calcCost(250, maxSpeedLevel);
             ui.buyScoreMultiplierButton.dataset.cost = calcCost(500, scoreMultiplierLevel);
 
-            ui.buyAccelerationButton.innerText = `Kaufen: ${ui.buyAccelerationButton.dataset.cost} C`;
-            ui.buyBrakingButton.innerText = `Kaufen: ${ui.buyBrakingButton.dataset.cost} C`;
-            ui.buyMaxSpeedButton.innerText = `Kaufen: ${ui.buyMaxSpeedButton.dataset.cost} C`;
-            ui.buyScoreMultiplierButton.innerText = `Kaufen: ${ui.buyScoreMultiplierButton.dataset.cost} C`;
+            ui.buyAccelerationButton.innerText = `Buy: ${ui.buyAccelerationButton.dataset.cost} C`;
+            ui.buyBrakingButton.innerText = `Buy: ${ui.buyBrakingButton.dataset.cost} C`;
+            ui.buyMaxSpeedButton.innerText = `Buy: ${ui.buyMaxSpeedButton.dataset.cost} C`;
+            ui.buyScoreMultiplierButton.innerText = `Buy: ${ui.buyScoreMultiplierButton.dataset.cost} C`;
 
             // Buttons deaktivieren, wenn nicht genug Credits
             ui.buyAccelerationButton.disabled = window.credits < ui.buyAccelerationButton.dataset.cost;
@@ -2565,18 +2565,18 @@
                 const gameStateJSON = JSON.stringify(gameState);
                 localStorage.setItem('pocketSubwaySave', gameStateJSON);
 
-                console.log('Spielstand gespeichert!');
+                console.log('Game saved!');
                 const originalText = ui.saveButton.innerText;
-                ui.saveButton.innerText = 'Gespeichert!';
+                ui.saveButton.innerText = 'Saved!';
                 ui.saveButton.disabled = true;
                 // UI-Feedback ist so kurz, dass ein Timeout nicht nötig ist und Tests stört.
                 ui.saveButton.innerText = originalText;
                 ui.saveButton.disabled = false;
 
             } catch (error) {
-                console.error('Fehler beim Speichern des Spiels:', error);
+                console.error('Error saving game:', error);
                 const originalText = ui.saveButton.innerText;
-                ui.saveButton.innerText = 'Fehler!';
+                ui.saveButton.innerText = 'Error!';
                 setTimeout(() => { // Kurzes Fehler-Feedback beibehalten
                     ui.saveButton.innerText = originalText;
                 }, 2000);
@@ -2587,7 +2587,7 @@
             try {
                 const gameStateJSON = localStorage.getItem('pocketSubwaySave');
                 if (!gameStateJSON) {
-                    console.warn('Kein Spielstand gefunden.');
+                    console.warn('No save game found.');
                     return;
                 }
 
@@ -2605,7 +2605,7 @@
 
                         // Kompatibilität prüfen (bleibt gleich)
                         if (!gameState.saveVersion || gameState.saveVersion < 3) {
-                             console.warn('Lade veralteten Spielstand. Nur Basis-Daten werden wiederhergestellt.');
+                             console.warn('Loading old save file. Only basic data restored.');
                             window.playerDistance = gameState.playerDistance || 0;
                             window.credits = gameState.score || 0; // Legacy support
                             window.playerSpeed = 0;
@@ -2705,7 +2705,7 @@
                             scheduleTimer = setInterval(() => {
                                 scheduleTime--;
                                 if (scheduleTime <= 0) {
-                                    ui.scheduleTime.innerText = "VERSPÄTET";
+                                    ui.scheduleTime.innerText = "LATE";
                                     ui.scheduleTime.classList.add('text-red-500');
                                     ui.scheduleTime.classList.remove('text-yellow-400');
                                     clearInterval(scheduleTimer);
@@ -2728,7 +2728,7 @@
                         ui.brakeValue.innerText = `${Math.round(window.brake * 100)}%`;
                         updateDoorButton();
 
-                        console.log('Spielstand geladen!');
+                        console.log('Game loaded!');
 
                         // Ladevorgang abgeschlossen
                         ui.loadingScreen.style.display = 'none';
@@ -2737,7 +2737,7 @@
 
 
                     } catch (error) {
-                        console.error('Fehler im asynchronen Lade-Teil:', error);
+                        console.error('Error in async load part:', error);
                         ui.loadingScreen.style.display = 'none';
                         // Spiel im Zweifel fortsetzen, um nicht stecken zu bleiben
                         isPaused = false;
@@ -2747,7 +2747,7 @@
                 }, 50); // 50ms Timeout, damit der Browser den Ladebildschirm rendern kann
 
             } catch (error) {
-                console.error('Fehler beim Initialisieren des Ladevorgangs:', error);
+                console.error('Error initializing load process:', error);
                 ui.loadingScreen.style.display = 'none'; // Ladebildschirm im Fehlerfall ausblenden
                  if (isPaused) { // Wenn pausiert, wieder fortsetzen, um nicht stecken zu bleiben
                     isPaused = false;
@@ -3089,7 +3089,7 @@
                 if (window.playerSpeed < 0.1) {
                     if (currentStation && !currentStation.visited) {
                         let bonus = 0;
-                        let message = `Angehalten in ${currentStation.name}. Öffne die Türen zum Ein- und Aussteigen.`;
+                        let message = `Stopped at ${currentStation.name}. Open doors to board/alight.`;
                         if (scheduleTimer) {
                             clearInterval(scheduleTimer);
                             scheduleTimer = null;
@@ -3098,7 +3098,7 @@
                             if (scheduleTime > 0) {
                                 bonus = Math.round(50 * scoreMultiplier);
                                 window.credits += bonus;
-                                message += `\nPünktlich! +${bonus} Bonus!`;
+                                message += `\nOn Time! +${bonus} Bonus!`;
                                 updateAchievementProgress('punctual', 1);
                             }
                             scheduleTime = 0;
@@ -3127,7 +3127,7 @@
                         // Zeige eine temporäre "Ankunft"-Nachricht an, wenn keine andere wichtige Nachricht angezeigt wird
                         if (!ui.statusMessage.dataset.signal && !ui.statusMessage.dataset.station && !ui.statusMessage.dataset.achievement) {
                              delete ui.statusMessage.dataset.station; // Vorsichtshalber löschen
-                             ui.statusMessage.innerText = `Haltestelle: ${currentStation.name}`;
+                             ui.statusMessage.innerText = `Station: ${currentStation.name}`;
                              ui.statusMessage.classList.remove('hidden', 'bg-green-500', 'bg-red-500');
                              ui.statusMessage.classList.add('bg-blue-600');
                         }
@@ -3147,7 +3147,7 @@
                         window.credits -= penalty;
                         const stationName = previousStation.name;
                         ui.statusMessage.dataset.station = stationName;
-                        ui.statusMessage.innerText = `Station ${stationName} verpasst! -${penalty} Credits`;
+                        ui.statusMessage.innerText = `Station ${stationName} missed! -${penalty} Credits`;
                         ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
                         ui.statusMessage.classList.add('bg-red-500');
 
@@ -3173,7 +3173,7 @@
                     scheduleTimer = setInterval(() => {
                         scheduleTime--;
                         if (scheduleTime <= 0) {
-                            ui.scheduleTime.innerText = "VERSPÄTET";
+                            ui.scheduleTime.innerText = "LATE";
                             ui.scheduleTime.classList.add('text-red-500');
                             ui.scheduleTime.classList.remove('text-yellow-400');
                             clearInterval(scheduleTimer);
@@ -3225,7 +3225,7 @@
 
                             const signalId = `signal-${signal.distance}`;
                             ui.statusMessage.dataset.signal = signalId;
-                            ui.statusMessage.innerText = `An rotem Signal gehalten! +${credits} Credits`;
+                            ui.statusMessage.innerText = `Stopped at red signal! +${credits} Credits`;
                             ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-red-500');
                             ui.statusMessage.classList.add('bg-green-500');
 
@@ -3252,7 +3252,7 @@
 
                         const signalId = `signal-${signal.distance}`;
                         ui.statusMessage.dataset.signal = signalId;
-                        ui.statusMessage.innerText = `Rotes Signal überfahren! -${penalty} Credits`;
+                        ui.statusMessage.innerText = `Red signal passed! -${penalty} Credits`;
                         ui.statusMessage.classList.remove('hidden', 'bg-blue-600', 'bg-green-500');
                         ui.statusMessage.classList.add('bg-red-500');
 
@@ -3288,8 +3288,8 @@
                 return;
             }
 
-            const ansage = new SpeechSynthesisUtterance(`Nächste Station: ${stationsname}`);
-            ansage.lang = 'de-DE';
+            const ansage = new SpeechSynthesisUtterance(`Next station: ${stationsname}`);
+            ansage.lang = 'en-US';
             ansage.rate = 0.9;
             ansage.pitch = 1.1;
             window.speechSynthesis.speak(ansage);
