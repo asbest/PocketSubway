@@ -1078,25 +1078,31 @@
 
         // --- Prozedurale Materialerzeugung ---
         function createProceduralMaterials() {
-             // Tunnel Material
-            const { texture: brickTexture, normalTexture: brickNormal } = generateBrickTexture(256, 256);
-            brickTexture.wrapS = THREE.RepeatWrapping;
-            brickTexture.wrapT = THREE.RepeatWrapping;
-            brickNormal.wrapS = THREE.RepeatWrapping;
-            brickNormal.wrapT = THREE.RepeatWrapping;
+             // Tunnel Material - Grey Brown Stain
+            const { texture: stainTexture, normalTexture: stainNormal } = generateNoiseTexture(512, 512, {
+                scale: 40,
+                octaves: 4,
+                persistence: 0.6,
+                lacunarity: 2.0,
+                color1: 0x707070, // Grey
+                color2: 0x4a3b30  // Dark Brown
+            });
+            stainTexture.wrapS = THREE.RepeatWrapping;
+            stainTexture.wrapT = THREE.RepeatWrapping;
+            stainNormal.wrapS = THREE.RepeatWrapping;
+            stainNormal.wrapT = THREE.RepeatWrapping;
 
-            // Die Wiederholung in Y-Richtung (Umfang) wird auf 40 gesetzt für eine realistischere Ziegelhöhe.
-            // Die X-Wiederholung (Länge) wird nach der Streckengenerierung basierend auf der echten Länge berechnet.
-            brickTexture.repeat.set(1, 40);
-            brickNormal.repeat.set(1, 40);
+            // Less repetition for a stained look
+            stainTexture.repeat.set(1, 4);
+            stainNormal.repeat.set(1, 4);
 
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
-                map: brickTexture,
-                normalMap: brickNormal,
-                normalScale: new THREE.Vector2(1, 1),
+                map: stainTexture,
+                normalMap: stainNormal,
+                normalScale: new THREE.Vector2(0.5, 0.5),
                 side: THREE.BackSide, 
-                roughness: 0.9,
-                metalness: 0.05
+                roughness: 0.8,
+                metalness: 0.1
             });
 
             // Schienen Material
