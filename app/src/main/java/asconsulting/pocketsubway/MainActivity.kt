@@ -1,17 +1,16 @@
 package asconsulting.pocketsubway
 
 import android.os.Bundle
-import android.view.Window
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.RelativeLayout
+import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.view.updateLayoutParams
+import androidx.core.view.updatePadding
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.MobileAds
@@ -23,27 +22,32 @@ class MainActivity : AppCompatActivity() {
         // Hide the title bar
         supportActionBar?.hide()
 
+        // Enable edge-to-edge display
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        setContentView(R.layout.activity_main)
+
+        // Make the app immersive
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
-        setContentView(R.layout.activity_main)
+        // Apply insets to the root layout to avoid content being obscured by system bars
+        val rootLayout = findViewById<LinearLayout>(R.id.root_layout)
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            // Apply the insets as padding to the root layout
+            view.updatePadding(bottom = insets.bottom)
+
+            WindowInsetsCompat.CONSUMED
+        }
 
         MobileAds.initialize(this) {}
 
         val adView = findViewById<AdView>(R.id.adView)
         val adRequest = AdRequest.Builder().build()
         adView.loadAd(adRequest)
-
-        ViewCompat.setOnApplyWindowInsetsListener(adView) { view, windowInsets ->
-            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updateLayoutParams<RelativeLayout.LayoutParams> {
-                bottomMargin = insets.bottom
-            }
-            WindowInsetsCompat.CONSUMED
-        }
 
         val webView: WebView = findViewById(R.id.webview)
         webView.settings.javaScriptEnabled = true
