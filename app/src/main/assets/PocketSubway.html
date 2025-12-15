@@ -144,6 +144,18 @@
                             <div class="w-14 h-7 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
                         </label>
                     </div>
+
+                    <!-- Tunnel Texture Settings -->
+                    <div class="flex flex-col items-center bg-gray-800 bg-opacity-80 p-4 rounded-lg text-white">
+                        <span class="text-lg font-bold mb-2">Tunnel</span>
+                        <div class="flex items-center space-x-2">
+                             <select id="tunnel-texture-select" class="bg-gray-700 text-white rounded p-1 text-sm border-none focus:ring-2 focus:ring-blue-500">
+                                 <option value="stain">Stain</option>
+                                 <option value="brick">Brick</option>
+                             </select>
+                             <input type="color" id="tunnel-color-picker" value="#707070" class="h-8 w-8 bg-transparent border-none cursor-pointer rounded overflow-hidden" title="Choose Color">
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -463,7 +475,7 @@
             return { texture, normalTexture };
         }
 
-        function generateBrickTexture(width, height) {
+        function generateBrickTexture(width, height, colorStr = '#8B4513') {
             const canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
@@ -477,7 +489,7 @@
             const brickWidth = 60;
             const brickHeight = 20;
             const mortarThickness = 4;
-            const brickColor = '#8B4513';
+            const brickColor = colorStr;
             const mortarColor = '#555555'; // Etwas dunkler für Diffuse
 
             // --- Diffuse Map ---
@@ -1078,25 +1090,31 @@
 
         // --- Prozedurale Materialerzeugung ---
         function createProceduralMaterials() {
-             // Tunnel Material
-            const { texture: brickTexture, normalTexture: brickNormal } = generateBrickTexture(256, 256);
-            brickTexture.wrapS = THREE.RepeatWrapping;
-            brickTexture.wrapT = THREE.RepeatWrapping;
-            brickNormal.wrapS = THREE.RepeatWrapping;
-            brickNormal.wrapT = THREE.RepeatWrapping;
+             // Tunnel Material - Grey Brown Stain
+            const { texture: stainTexture, normalTexture: stainNormal } = generateNoiseTexture(512, 512, {
+                scale: 40,
+                octaves: 4,
+                persistence: 0.6,
+                lacunarity: 2.0,
+                color1: 0x707070, // Grey
+                color2: 0x4a3b30  // Dark Brown
+            });
+            stainTexture.wrapS = THREE.RepeatWrapping;
+            stainTexture.wrapT = THREE.RepeatWrapping;
+            stainNormal.wrapS = THREE.RepeatWrapping;
+            stainNormal.wrapT = THREE.RepeatWrapping;
 
-            // Die Wiederholung in Y-Richtung (Umfang) wird auf 40 gesetzt für eine realistischere Ziegelhöhe.
-            // Die X-Wiederholung (Länge) wird nach der Streckengenerierung basierend auf der echten Länge berechnet.
-            brickTexture.repeat.set(1, 40);
-            brickNormal.repeat.set(1, 40);
+            // Less repetition for a stained look
+            stainTexture.repeat.set(1, 4);
+            stainNormal.repeat.set(1, 4);
 
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
-                map: brickTexture,
-                normalMap: brickNormal,
-                normalScale: new THREE.Vector2(1, 1),
+                map: stainTexture,
+                normalMap: stainNormal,
+                normalScale: new THREE.Vector2(0.5, 0.5),
                 side: THREE.BackSide, 
-                roughness: 0.9,
-                metalness: 0.05
+                roughness: 0.8,
+                metalness: 0.1
             });
 
             // Schienen Material
@@ -2332,6 +2350,72 @@
             document.getElementById('sound-toggle').addEventListener('change', (e) => {
                 Tone.Destination.mute = !e.target.checked;
             });
+
+            // Tunnel Settings
+            const textureSelect = document.getElementById('tunnel-texture-select');
+            const colorPicker = document.getElementById('tunnel-color-picker');
+
+            const updateTunnelHandler = () => {
+                updateTunnelVisuals(textureSelect.value, colorPicker.value);
+            };
+
+            textureSelect.addEventListener('change', updateTunnelHandler);
+            colorPicker.addEventListener('change', updateTunnelHandler); // 'change' fires on close/commit
+        }
+
+        function updateTunnelVisuals(type, colorHex) {
+            if (!tunnelMaterial) return;
+
+            let newMap, newNormalMap, repeatY;
+
+            if (type === 'brick') {
+                const { texture, normalTexture } = generateBrickTexture(512, 512, colorHex);
+                newMap = texture;
+                newNormalMap = normalTexture;
+                repeatY = 10; // More repetitions for bricks
+                tunnelMaterial.roughness = 0.9;
+                tunnelMaterial.metalness = 0.05;
+            } else {
+                // Stain
+                const c1 = new THREE.Color(colorHex);
+                const c2 = c1.clone().offsetHSL(0, 0, -0.3); // Darker version
+
+                const { texture, normalTexture } = generateNoiseTexture(512, 512, {
+                    scale: 40,
+                    octaves: 4,
+                    persistence: 0.6,
+                    lacunarity: 2.0,
+                    color1: c1.getHex(),
+                    color2: c2.getHex()
+                });
+                newMap = texture;
+                newNormalMap = normalTexture;
+                repeatY = 4;
+                tunnelMaterial.roughness = 0.8;
+                tunnelMaterial.metalness = 0.1;
+            }
+
+            // Apply wrapping
+            newMap.wrapS = THREE.RepeatWrapping;
+            newMap.wrapT = THREE.RepeatWrapping;
+            newNormalMap.wrapS = THREE.RepeatWrapping;
+            newNormalMap.wrapT = THREE.RepeatWrapping;
+
+            // Recalculate repeat X based on track length logic
+            const tunnelCircumference = 2 * Math.PI * 5.0;
+            const physicalHeightOfOneRepeat = tunnelCircumference / repeatY;
+            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Square aspect for texture tiles
+
+            const repeatX = totalTrackLength > 0 ? totalTrackLength / physicalWidthOfOneRepeat : 1;
+
+            newMap.repeat.set(repeatX, repeatY);
+            newNormalMap.repeat.set(repeatX, repeatY);
+
+            // Update Material
+            tunnelMaterial.map = newMap;
+            tunnelMaterial.normalMap = newNormalMap;
+            tunnelMaterial.normalScale.set(0.5, 0.5);
+            tunnelMaterial.needsUpdate = true;
         }
 
         function handlePassengerExchange() {
