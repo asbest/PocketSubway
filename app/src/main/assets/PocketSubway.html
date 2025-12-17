@@ -1233,8 +1233,8 @@
                 octaves: 4,
                 persistence: 0.5,
                 lacunarity: 2.0,
-                color1: 0x228B22, // Forest Green
-                color2: 0x32CD32  // Lime Green
+                color1: 0x3A5F0B, // Deep Olive Green (more muted)
+                color2: 0x556B2F  // Dark Olive Green (less neon)
             });
             groundTexture.wrapS = THREE.RepeatWrapping;
             groundTexture.wrapT = THREE.RepeatWrapping;
@@ -3054,10 +3054,10 @@
             const currentType = getEnvTypeAt(playerDistance);
 
             // Define target values
-            const targetFogColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x87CEEB); // Sky Blue
+            const targetFogColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd); // Muted Blue-Grey
             const targetFogNear = currentType === 'Tunnel' ? 50 : 200;
             const targetFogFar = currentType === 'Tunnel' ? 800 : 3000;
-            const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x87CEEB);
+            const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
             const targetHeadlightIntensity = currentType === 'Tunnel' ? 2.0 : 0.0; // Turn off headlight in day
             // But we might want headlight in tunnel only.
             // Current headlight setup: controlled by UI primarily.
