@@ -1335,7 +1335,8 @@
             let nextSignalDistance = 1000 + Math.random() * 1000;
 
             let currentEnvType = 'Tunnel';
-            let stationsInCurrentEnv = 0;
+            let stationsInCurrentEnv = 1; // Start station counts as 1
+            let targetStationsInEnv = Math.floor(Math.random() * 6) + 5; // 5 to 10 stations for first tunnel
             let lastEnvChangeDist = 0;
 
             // --- 3. Restliche Strecke prozedural generieren ---
@@ -1412,7 +1413,7 @@
                 // Environment Switching Logic
                 if (isStation) {
                     stationsInCurrentEnv++;
-                    if (stationsInCurrentEnv >= 2) {
+                    if (stationsInCurrentEnv >= targetStationsInEnv) {
                         // Switch environment after this station
                         window.envSegments.push({
                             start: lastEnvChangeDist,
@@ -1421,7 +1422,15 @@
                         });
 
                         lastEnvChangeDist = totalTrackLength;
-                        currentEnvType = (currentEnvType === 'Tunnel') ? 'Countryside' : 'Tunnel';
+
+                        if (currentEnvType === 'Tunnel') {
+                            currentEnvType = 'Countryside';
+                            targetStationsInEnv = 2; // Countryside always 2 stations
+                        } else {
+                            currentEnvType = 'Tunnel';
+                            targetStationsInEnv = Math.floor(Math.random() * 6) + 5; // Tunnel 5-10 stations
+                        }
+
                         stationsInCurrentEnv = 0;
                     }
                 }
