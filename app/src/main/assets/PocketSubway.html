@@ -697,6 +697,7 @@
         let driverCab; // Das 3D-Modell des Cockpits, das an die Kamera angehängt ist.
         let trackCurve; // Eine THREE.CatmullRomCurve3, die den exakten Verlauf der Strecke definiert.
         let totalTrackLength = 0; // Die Gesamtlänge der Strecke in Metern.
+        window.envSegments = []; // Stores segments: { start: 0, end: 1000, type: 'Tunnel' }
 
         // Spieler-Zustand (an `window` gebunden für leichten Zugriff und Speicherung)
         window.playerDistance = 0; // Die vom Spieler zurückgelegte Distanz auf der Strecke in Metern.
@@ -817,9 +818,10 @@
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
-        let tunnelMaterial, railMaterial, tieMaterial, cableMaterial, trackbedMaterial;
+        let tunnelMaterial, countrysideMaterial, railMaterial, tieMaterial, cableMaterial, trackbedMaterial;
         let stationWallMaterial, stationFloorMaterial;
         let signalMastMaterial, signalLightRedMaterial, signalLightGreenMaterial, signalBoxRedMaterial, signalBoxGreenMaterial;
+        let treeTrunkMaterial, treeFoliageMaterial, cloudMaterial;
         
         // Instanced Meshes für Signale, global zugänglich für Updates
         let signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh;
@@ -886,8 +888,8 @@
 			camera.add(headlight.target);
             
             // HemisphereLight reduziert
-            const hemisphereLight = new THREE.HemisphereLight(0x202020, 0x101010, 0.4);
-            scene.add(hemisphereLight);
+            window.hemisphereLight = new THREE.HemisphereLight(0x202020, 0x101010, 0.4);
+            scene.add(window.hemisphereLight);
             
             // Cockpit erstellen
             createDriverCab();
@@ -1225,6 +1227,31 @@
                 roughness: 0.85,
                 metalness: 0.0
             });
+
+            // Countryside Material (Grass/Ground)
+            const { texture: groundTexture, normalTexture: groundNormal } = generateNoiseTexture(512, 512, {
+                scale: 60,
+                octaves: 4,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                color1: 0x3A5F0B, // Deep Olive Green (more muted)
+                color2: 0x556B2F  // Dark Olive Green (less neon)
+            });
+            groundTexture.wrapS = THREE.RepeatWrapping;
+            groundTexture.wrapT = THREE.RepeatWrapping;
+            groundNormal.wrapS = THREE.RepeatWrapping;
+            groundNormal.wrapT = THREE.RepeatWrapping;
+
+            countrysideMaterial = new THREE.MeshStandardMaterial({
+                map: groundTexture,
+                normalMap: groundNormal,
+                roughness: 1.0,
+                metalness: 0.0
+            });
+
+            treeTrunkMaterial = new THREE.MeshStandardMaterial({ color: 0x5D4037, roughness: 0.9 });
+            treeFoliageMaterial = new THREE.MeshStandardMaterial({ color: 0x33691E, roughness: 0.8 });
+            cloudMaterial = new THREE.MeshStandardMaterial({ color: 0xDDDDDD, roughness: 0.4, transparent: true, opacity: 0.8 });
         }
 
 
@@ -1237,6 +1264,7 @@
             let currentCurvature = 0;
             let currentInclineRate = 0; 
             totalTrackLength = 0;
+            window.envSegments = [];
 
             const up = new THREE.Vector3(0, 1, 0);
             const tempVec = new THREE.Vector3();
@@ -1311,6 +1339,11 @@
             let lastWasStation = true; 
             let nextSignalDistance = 1000 + Math.random() * 1000;
 
+            let currentEnvType = 'Tunnel';
+            let stationsInCurrentEnv = 1; // Start station counts as 1
+            let targetStationsInEnv = Math.floor(Math.random() * 6) + 5; // 5 to 10 stations for first tunnel
+            let lastEnvChangeDist = 0;
+
             // --- 3. Restliche Strecke prozedural generieren ---
             for (let i = 1; i < NUM_SEGMENTS; i++) { 
                 const isStation = Math.random() < 0.2 && !lastWasStation; 
@@ -1381,7 +1414,39 @@
                         }
                     }
                 }
+
+                // Environment Switching Logic
+                if (isStation) {
+                    stationsInCurrentEnv++;
+                    if (stationsInCurrentEnv >= targetStationsInEnv) {
+                        // Switch environment after this station
+                        window.envSegments.push({
+                            start: lastEnvChangeDist,
+                            end: totalTrackLength,
+                            type: currentEnvType
+                        });
+
+                        lastEnvChangeDist = totalTrackLength;
+
+                        if (currentEnvType === 'Tunnel') {
+                            currentEnvType = 'Countryside';
+                            targetStationsInEnv = 2; // Countryside always 2 stations
+                        } else {
+                            currentEnvType = 'Tunnel';
+                            targetStationsInEnv = Math.floor(Math.random() * 6) + 5; // Tunnel 5-10 stations
+                        }
+
+                        stationsInCurrentEnv = 0;
+                    }
+                }
             }
+
+            // Add final segment
+            window.envSegments.push({
+                start: lastEnvChangeDist,
+                end: totalTrackLength,
+                type: currentEnvType
+            });
 
 
             trackCurve = new THREE.CatmullRomCurve3(points);
@@ -1391,6 +1456,9 @@
             // Geometrie für die Strecke erstellen
             createTrackGeometry(trackCurve);
             
+            createTrees(trackCurve);
+            createClouds(trackCurve);
+
             // Bahnhöfe erstellen
             createStations(trackCurve);
 
@@ -1407,10 +1475,180 @@
             tunnelMaterial.normalMap.needsUpdate = true;
         }
 
+        function createTrees(curve) {
+            if (!window.envSegments) return;
+
+            let totalLengthCountryside = 0;
+            for (const seg of window.envSegments) {
+                if (seg.type === 'Countryside') {
+                    totalLengthCountryside += (seg.end - seg.start);
+                }
+            }
+
+            if (totalLengthCountryside === 0) return;
+
+            const density = 0.05; // 1 tree every 20m per side approx
+            const treeCount = Math.floor(totalLengthCountryside * density * 2);
+            if (treeCount === 0) return;
+
+            const trunkGeo = new THREE.CylinderGeometry(0.5, 0.7, 3, 6);
+            const foliageGeo = new THREE.ConeGeometry(3, 7, 8);
+
+            const trunkMesh = new THREE.InstancedMesh(trunkGeo, treeTrunkMaterial, treeCount);
+            const foliageMesh = new THREE.InstancedMesh(foliageGeo, treeFoliageMaterial, treeCount);
+
+            trunkMesh.castShadow = true;
+            trunkMesh.receiveShadow = true;
+            foliageMesh.castShadow = true;
+            foliageMesh.receiveShadow = true;
+
+            const dummy = new THREE.Object3D();
+            const pos = new THREE.Vector3();
+            const tangent = new THREE.Vector3();
+            const up = new THREE.Vector3(0, 1, 0);
+            const binormal = new THREE.Vector3();
+
+            let idx = 0;
+
+            for (const seg of window.envSegments) {
+                if (seg.type !== 'Countryside') continue;
+
+                for (let d = seg.start; d < seg.end; d += 20) {
+                     // Check if not too close to totalTrackLength to avoid wrap issues
+                     if (d > totalTrackLength) break;
+
+                     const t = d / totalTrackLength;
+                     curve.getPointAt(t, pos);
+                     curve.getTangentAt(t, tangent);
+                     binormal.crossVectors(up, tangent).normalize();
+
+                     // Left Tree
+                     if (idx < treeCount) {
+                         const dist = 15 + Math.random() * 20;
+                         const treePos = pos.clone().add(binormal.clone().multiplyScalar(dist));
+                         treePos.y -= 0.5; // Base adjustment
+
+                         dummy.position.copy(treePos);
+                         dummy.rotation.set(0, Math.random() * Math.PI, 0);
+                         const scale = 0.8 + Math.random() * 0.6;
+                         dummy.scale.set(scale, scale, scale);
+                         dummy.updateMatrix();
+                         trunkMesh.setMatrixAt(idx, dummy.matrix);
+
+                         dummy.position.y += 3.0 * scale;
+                         dummy.updateMatrix();
+                         foliageMesh.setMatrixAt(idx, dummy.matrix);
+
+                         idx++;
+                     }
+
+                     // Right Tree
+                     if (idx < treeCount) {
+                         const dist = - (15 + Math.random() * 20);
+                         const treePos = pos.clone().add(binormal.clone().multiplyScalar(dist));
+                         treePos.y -= 0.5;
+
+                         dummy.position.copy(treePos);
+                         dummy.rotation.set(0, Math.random() * Math.PI, 0);
+                         const scale = 0.8 + Math.random() * 0.6;
+                         dummy.scale.set(scale, scale, scale);
+                         dummy.updateMatrix();
+                         trunkMesh.setMatrixAt(idx, dummy.matrix);
+
+                         dummy.position.y += 3.0 * scale;
+                         dummy.updateMatrix();
+                         foliageMesh.setMatrixAt(idx, dummy.matrix);
+
+                         idx++;
+                     }
+                }
+            }
+
+            trunkMesh.count = idx;
+            foliageMesh.count = idx;
+            trunkMesh.instanceMatrix.needsUpdate = true;
+            foliageMesh.instanceMatrix.needsUpdate = true;
+
+            trackGroup.add(trunkMesh);
+            trackGroup.add(foliageMesh);
+        }
+
+        function createClouds(curve) {
+            if (!window.envSegments) return;
+
+            let totalLengthCountryside = 0;
+            for (const seg of window.envSegments) {
+                if (seg.type === 'Countryside') {
+                    totalLengthCountryside += (seg.end - seg.start);
+                }
+            }
+
+            if (totalLengthCountryside === 0) return;
+
+            const density = 0.02; // 1 cloud every 50m
+            const cloudCount = Math.floor(totalLengthCountryside * density);
+            if (cloudCount === 0) return;
+
+            const cloudGeo = new THREE.SphereGeometry(10, 8, 8);
+            const cloudMesh = new THREE.InstancedMesh(cloudGeo, cloudMaterial, cloudCount * 5); // 5 puffs per cloud
+
+            cloudMesh.castShadow = false;
+            cloudMesh.receiveShadow = false; // Clouds don't receive shadow usually
+
+            const dummy = new THREE.Object3D();
+            const pos = new THREE.Vector3();
+
+            let idx = 0;
+
+            for (const seg of window.envSegments) {
+                if (seg.type !== 'Countryside') continue;
+
+                for (let d = seg.start; d < seg.end; d += 50) {
+                    if (d > totalTrackLength) break;
+
+                    const t = d / totalTrackLength;
+                    curve.getPointAt(t, pos);
+
+                    if (idx < cloudMesh.count) {
+                        const height = 60 + Math.random() * 40;
+                        const offsetX = (Math.random() - 0.5) * 200;
+                        const cloudPos = pos.clone();
+                        cloudPos.y += height;
+                        // Use world X for offset since track curves, but simple random offset is fine for sky
+                        cloudPos.x += offsetX;
+                        cloudPos.z += (Math.random() - 0.5) * 50;
+
+                        // Create a "cloud" from multiple puffs
+                        const puffs = 3 + Math.floor(Math.random() * 3);
+                        for(let p=0; p<puffs; p++) {
+                            if (idx >= cloudMesh.count) break;
+
+                            const puffPos = cloudPos.clone().add(new THREE.Vector3(
+                                (Math.random()-0.5)*15,
+                                (Math.random()-0.5)*5,
+                                (Math.random()-0.5)*15
+                            ));
+
+                            dummy.position.copy(puffPos);
+                            dummy.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+                            const scale = 1.0 + Math.random() * 1.5;
+                            dummy.scale.set(scale, scale, scale);
+                            dummy.updateMatrix();
+                            cloudMesh.setMatrixAt(idx, dummy.matrix);
+                            idx++;
+                        }
+                    }
+                }
+            }
+
+            cloudMesh.count = idx;
+            cloudMesh.instanceMatrix.needsUpdate = true;
+            trackGroup.add(cloudMesh);
+        }
+
         // --- Strecken-Geometrie ---
         function createTrackGeometry(curve) {
             
-            const tunnelPoints = [];
             const railPointsLeft = [];
             const railPointsRight = [];
             
@@ -1441,26 +1679,130 @@
                 const posRight = pos.clone().add(binormal.clone().multiplyScalar(-railOffset)).add(normal.clone().multiplyScalar(railHeight));
                 railPointsLeft.push(posLeft);
                 railPointsRight.push(posRight);
-
-                // 2. Tunnel-Mittelpunkt-Position (angehoben)
-                const tunnelCenterPos = pos.clone().add(normal.clone().multiplyScalar(tunnelOffsetY));
-                tunnelPoints.push(tunnelCenterPos);
             }
 
-            // 1. Der Tunnel
-            const tunnelCurve = new THREE.CatmullRomCurve3(tunnelPoints);
-            const tunnelGeometry = new THREE.TubeGeometry(tunnelCurve, TUBE_SEGMENTS, tunnelRadius, 32, false);
-            const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
-            tunnelMesh.receiveShadow = true; // Schatten empfangen
-            trackGroup.add(tunnelMesh);
+            // --- Geometrie pro Segment erstellen (Tunnel vs Countryside) ---
+            if (!window.envSegments || window.envSegments.length === 0) {
+                 // Fallback für alte Saves oder Fehler
+                 window.envSegments = [{ start: 0, end: totalTrackLength, type: 'Tunnel' }];
+            }
 
-            // Tunnelbögen hinzufügen
+            for (const seg of window.envSegments) {
+                const segPoints = [];
+                const steps = Math.max(2, Math.floor((seg.end - seg.start)));
+
+                for (let i = 0; i <= steps; i++) {
+                    const d = seg.start + (i / steps) * (seg.end - seg.start);
+                    // Prevent wrapping/overflow issues
+                    if (d > totalTrackLength) break;
+
+                    const t = d / totalTrackLength;
+                    curve.getPointAt(t, pos);
+                    curve.getTangentAt(t, tangent);
+                    binormal.crossVectors(up, tangent).normalize();
+                    normal.crossVectors(tangent, binormal).normalize();
+
+                    if (seg.type === 'Tunnel') {
+                        // Tunnel center
+                        segPoints.push(pos.clone().add(normal.clone().multiplyScalar(tunnelOffsetY)));
+                    } else {
+                        // Countryside "Ground" center (slightly below rails)
+                        segPoints.push(pos.clone().add(normal.clone().multiplyScalar(-2.0)));
+                    }
+                }
+
+                const segCurve = new THREE.CatmullRomCurve3(segPoints);
+                // Adjust tubular segments based on length
+                const segTubularSegments = Math.max(10, Math.floor((seg.end - seg.start) / 2));
+
+                if (seg.type === 'Tunnel') {
+                    const tunnelGeometry = new THREE.TubeGeometry(segCurve, segTubularSegments, tunnelRadius, 32, false);
+                    const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
+                    tunnelMesh.receiveShadow = true;
+                    trackGroup.add(tunnelMesh);
+                } else {
+                    // Countryside Ground Strip
+                    // Using TubeGeometry with scale or custom geometry could work.
+                    // For simplicity, let's use a flattened TubeGeometry (half pipe style?)
+                    // Or just a wide flat boxy tube?
+                    const groundRadius = 15.0; // Wide ground
+                    // TubeGeometry always makes a closed tube.
+                    // Let's stick to TubeGeometry but with `countrysideMaterial` and position it lower.
+                    // Actually, a giant tube looks okay as "ground" if we are inside it or on top.
+                    // But we want "open air".
+                    // Let's use a TubeGeometry but huge radius so it looks flat? No.
+
+                    // Let's make a Ribbon Geometry manually for Countryside
+                    // Or use TubeGeometry with a modified shape? No easy way.
+
+                    // Simple hack: Use TubeGeometry but large radius, positioned way down?
+                    // Or just use the TubeGeometry but with BackSide (so we are inside) and Sky visible above?
+                    // If we use TubeGeometry, we have walls.
+                    // We want NO walls.
+
+                    // Let's create a custom ribbon mesh.
+                    const width = 40;
+                    const ribbonGeo = new THREE.PlaneGeometry(width, seg.end - seg.start, 1, segTubularSegments);
+                    // Modify vertices to follow curve? That's complex.
+
+                    // Easier: TubeGeometry but use a material that is transparent/invisible on top?
+                    // Or just use TubeGeometry and don't care about walls? The user wants "country side".
+                    // That implies seeing the sky.
+
+                    // Best approach: TubeGeometry with `Side: BackSide` is standard tunnel.
+                    // For countryside, we can generate a "Ground" mesh which is just a strip.
+                    // Let's iterate and build a BufferGeometry.
+
+                    const geom = new THREE.BufferGeometry();
+                    const vertices = [];
+                    const uvs = [];
+                    const indices = [];
+
+                    for (let i = 0; i <= steps; i++) {
+                        const d = seg.start + (i / steps) * (seg.end - seg.start);
+                        const t = d / totalTrackLength;
+                        curve.getPointAt(t, pos);
+                        curve.getTangentAt(t, tangent);
+                        binormal.crossVectors(up, tangent).normalize();
+                        normal.crossVectors(tangent, binormal).normalize();
+
+                        // Left and Right points of the ground strip
+                        const w = 30.0; // Width
+                        const yOffset = -2.0;
+                        const p1 = pos.clone().add(binormal.clone().multiplyScalar(w)).add(normal.clone().multiplyScalar(yOffset));
+                        const p2 = pos.clone().add(binormal.clone().multiplyScalar(-w)).add(normal.clone().multiplyScalar(yOffset));
+
+                        vertices.push(p1.x, p1.y, p1.z);
+                        vertices.push(p2.x, p2.y, p2.z);
+
+                        uvs.push(0, i / steps * 10); // Repeat texture along length
+                        uvs.push(1, i / steps * 10);
+
+                        if (i < steps) {
+                            const base = i * 2;
+                            indices.push(base, base + 1, base + 2);
+                            indices.push(base + 1, base + 3, base + 2);
+                        }
+                    }
+
+                    geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                    geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                    geom.setIndex(indices);
+                    geom.computeVertexNormals();
+
+                    const groundMesh = new THREE.Mesh(geom, countrysideMaterial);
+                    groundMesh.receiveShadow = true;
+                    trackGroup.add(groundMesh);
+                }
+            }
+
+            // Tunnelbögen hinzufügen (filtered inside)
             createTunnelArches(curve, tunnelOffsetY);
 
-            // Tunneldetails (Kabel, Rohre) hinzufügen
+            // Tunneldetails (Kabel, Rohre) hinzufügen (filtered inside)
             createTunnelDetails(curve, tunnelOffsetY);
 
-            // Tunnelbeleuchtung hinzufügen
+            // Tunnelbeleuchtung hinzufügen (filtered inside)
             createTunnelLights(curve, tunnelOffsetY);
 
             // 2. Schienen
@@ -1526,6 +1868,19 @@
             trackGroup.add(trackbedMesh);
         }
 
+        function getEnvTypeAt(distance) {
+            if (!window.envSegments) return 'Tunnel';
+            // Wrap distance
+            let d = distance;
+            while(d < 0) d += totalTrackLength;
+            while(d > totalTrackLength) d -= totalTrackLength;
+
+            for (const seg of window.envSegments) {
+                if (d >= seg.start && d < seg.end) return seg.type;
+            }
+            return 'Tunnel';
+        }
+
         function createTunnelLights(curve, tunnelOffsetY) {
             const lightSpacing = 100;
             const lightColor = 0xffaa00; // Warm/Orangeish
@@ -1551,6 +1906,8 @@
 
             for (let i = 0; i < lightCount; i++) {
                 const distance = i * lightSpacing;
+
+                if (getEnvTypeAt(distance) !== 'Tunnel') continue;
 
                 // Check if in station
                  let inStation = false;
@@ -1613,6 +1970,8 @@
             for (let i = 0; i < archCount; i++) {
                 const distance = i * archSpacing;
 
+                if (getEnvTypeAt(distance) !== 'Tunnel') continue;
+
                 // Prüfen, ob der Bogen in einer Station wäre
                 let inStation = false;
                 for (const station of stations) {
@@ -1672,6 +2031,9 @@
 
             for (let i = 0; i < cableCount; i++) {
                 const distance = i * cableSpacing;
+
+                if (getEnvTypeAt(distance) !== 'Tunnel') continue;
+
                 const t = distance / totalTrackLength;
 
                 curve.getPointAt(t, pos);
@@ -2640,6 +3002,7 @@
                         color: s.color,
                         pointsAwarded: s.pointsAwarded,
                     })),
+                    envSegments: window.envSegments, // Save environment segments
 
                     // Pünktlichkeits-Zustand
                     scheduleTime: scheduleTime,
@@ -2767,8 +3130,13 @@
                         trackCurve.curveType = 'catmullrom';
                         trackCurve.tension = 0.5;
 
+                        // Restore segments AFTER totalTrackLength is available (before creating geometry)
+                        window.envSegments = gameState.envSegments || [{ start: 0, end: totalTrackLength, type: 'Tunnel' }];
+
                         // 6. Geometrie basierend auf der geladenen Kurve neu aufbauen
                         createTrackGeometry(trackCurve);
+                        createTrees(trackCurve);
+                        createClouds(trackCurve);
                         createStations(trackCurve);
                         createSignals(trackCurve);
                         const tunnelCircumference = 2 * Math.PI * 5.0;
@@ -2873,6 +3241,31 @@
             }
         }
 
+        // --- Environment Update ---
+        function updateEnvironment() {
+            const currentType = getEnvTypeAt(playerDistance);
+
+            // Define target values
+            const targetFogColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd); // Muted Blue-Grey
+            const targetFogNear = currentType === 'Tunnel' ? 50 : 200;
+            const targetFogFar = currentType === 'Tunnel' ? 800 : 3000;
+            const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
+
+            // Light Intensity Targets
+            const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.2;
+
+            // Lerp values
+            const lerpFactor = 0.02;
+            scene.background.lerp(targetBgColor, lerpFactor);
+            scene.fog.color.lerp(targetFogColor, lerpFactor);
+            scene.fog.near += (targetFogNear - scene.fog.near) * lerpFactor;
+            scene.fog.far += (targetFogFar - scene.fog.far) * lerpFactor;
+
+            if (window.hemisphereLight) {
+                window.hemisphereLight.intensity += (targetHemiIntensity - window.hemisphereLight.intensity) * lerpFactor;
+            }
+        }
+
         // --- Game Loop ---
         function animate() {
             requestAnimationFrame(animate);
@@ -2890,6 +3283,7 @@
             updatePeopleAnimation(dt);
             updatePhysics(dt);
             updateCameraPosition();
+            updateEnvironment(); // Update Environment Visuals
             updateDust();
             checkSignalStatus();
             checkStationStatus();
