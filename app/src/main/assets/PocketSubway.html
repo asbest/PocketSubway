@@ -887,8 +887,8 @@
 			camera.add(headlight.target);
             
             // HemisphereLight reduziert
-            const hemisphereLight = new THREE.HemisphereLight(0x202020, 0x101010, 0.4);
-            scene.add(hemisphereLight);
+            window.hemisphereLight = new THREE.HemisphereLight(0x202020, 0x101010, 0.4);
+            scene.add(window.hemisphereLight);
             
             // Cockpit erstellen
             createDriverCab();
@@ -2935,13 +2935,15 @@
                         // 4. Globale Arrays mit gespeicherten Daten füllen
                         gameState.stations.forEach(s => stations.push(s));
                         gameState.signals.forEach(s => signals.push(s));
-                        window.envSegments = gameState.envSegments || [{ start: 0, end: totalTrackLength, type: 'Tunnel' }]; // Restore segments
 
                         // 5. Strecke aus den gespeicherten Punkten neu erstellen
                         const loadedPoints = gameState.trackPoints.map(p => new THREE.Vector3(p.x, p.y, p.z));
                         trackCurve = new THREE.CatmullRomCurve3(loadedPoints);
                         trackCurve.curveType = 'catmullrom';
                         trackCurve.tension = 0.5;
+
+                        // Restore segments AFTER totalTrackLength is available (before creating geometry)
+                        window.envSegments = gameState.envSegments || [{ start: 0, end: totalTrackLength, type: 'Tunnel' }];
 
                         // 6. Geometrie basierend auf der geladenen Kurve neu aufbauen
                         createTrackGeometry(trackCurve);
@@ -3058,10 +3060,9 @@
             const targetFogNear = currentType === 'Tunnel' ? 50 : 200;
             const targetFogFar = currentType === 'Tunnel' ? 800 : 3000;
             const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
-            const targetHeadlightIntensity = currentType === 'Tunnel' ? 2.0 : 0.0; // Turn off headlight in day
-            // But we might want headlight in tunnel only.
-            // Current headlight setup: controlled by UI primarily.
-            // Let's just adjust ambient/fog.
+
+            // Light Intensity Targets
+            const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.2;
 
             // Lerp values
             const lerpFactor = 0.02;
@@ -3069,6 +3070,10 @@
             scene.fog.color.lerp(targetFogColor, lerpFactor);
             scene.fog.near += (targetFogNear - scene.fog.near) * lerpFactor;
             scene.fog.far += (targetFogFar - scene.fog.far) * lerpFactor;
+
+            if (window.hemisphereLight) {
+                window.hemisphereLight.intensity += (targetHemiIntensity - window.hemisphereLight.intensity) * lerpFactor;
+            }
         }
 
         // --- Game Loop ---
