@@ -3547,8 +3547,10 @@
             const targetFogFar = currentType === 'Tunnel' ? 800 : 3000;
             const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
 
-            // Light Intensity Targets
+            // Light Intensity & Color Targets
             const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.1;
+            const targetSkyColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
+            const targetGroundColor = currentType === 'Tunnel' ? new THREE.Color(0x101010) : new THREE.Color(0x554433);
 
             // Lerp values
             const lerpFactor = 0.02;
@@ -3559,6 +3561,8 @@
 
             if (window.hemisphereLight) {
                 window.hemisphereLight.intensity += (targetHemiIntensity - window.hemisphereLight.intensity) * lerpFactor;
+                window.hemisphereLight.color.lerp(targetSkyColor, lerpFactor);
+                window.hemisphereLight.groundColor.lerp(targetGroundColor, lerpFactor);
             }
         }
 
