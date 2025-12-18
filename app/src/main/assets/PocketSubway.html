@@ -253,7 +253,7 @@
 
                         </div>
                     </div>
-                    <div class="bg-black bg-opacity-40 p-1.5 rounded-lg shadow-lg text-right">
+                    <div class="bg-black bg-opacity-40 p-1.5 rounded-lg shadow-lg text-right pointer-events-auto">
                         <h2 class="text-[10px] font-semibold text-gray-400">SPEED</h2>
                         <p id="speed-display" class="text-lg font-bold font-mono">0</p>
                         <p class="text-xs text-gray-300">km/h</p>
@@ -2440,26 +2440,7 @@
                 stationGroup.add(textPlaneRight);
 
 
-                // 5. Bahnhofsbeleuchtung
-                const stationLight1 = new THREE.PointLight(0xffffee, 0.2, 120, 2);
-                stationLight1.position.set(STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, -station.length / 4);
-                stationLight1.isStationLight = true; 
-                stationGroup.add(stationLight1);
-
-                const stationLight2 = stationLight1.clone();
-                stationLight2.position.set(STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, station.length / 4);
-                stationLight2.isStationLight = true;
-                stationGroup.add(stationLight2);
-                
-                const stationLight3 = stationLight1.clone();
-                stationLight3.position.set(-STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, -station.length / 4);
-                stationLight3.isStationLight = true;
-                stationGroup.add(stationLight3);
-
-                const stationLight4 = stationLight1.clone();
-                stationLight4.position.set(-STATION_PLATFORM_OFFSET, STATION_PLATFORM_HEIGHT + stationWallHeight - 0.5, station.length / 4);
-                stationLight4.isStationLight = true;
-                stationGroup.add(stationLight4);
+                // 5. Bahnhofsbeleuchtung - ENTFERNT
 
                 // --- Personen hinzufügen (Optimiert mit InstancedMesh) ---
                 const numPeoplePerSide = Math.floor(Math.random() * 6) + 3;
@@ -3566,8 +3547,10 @@
             const targetFogFar = currentType === 'Tunnel' ? 800 : 3000;
             const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
 
-            // Light Intensity Targets
-            const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.2;
+            // Light Intensity & Color Targets
+            const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.1;
+            const targetSkyColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
+            const targetGroundColor = currentType === 'Tunnel' ? new THREE.Color(0x101010) : new THREE.Color(0x554433);
 
             // Lerp values
             const lerpFactor = 0.02;
@@ -3578,6 +3561,8 @@
 
             if (window.hemisphereLight) {
                 window.hemisphereLight.intensity += (targetHemiIntensity - window.hemisphereLight.intensity) * lerpFactor;
+                window.hemisphereLight.color.lerp(targetSkyColor, lerpFactor);
+                window.hemisphereLight.groundColor.lerp(targetGroundColor, lerpFactor);
             }
         }
 
