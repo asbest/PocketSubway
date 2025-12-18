@@ -545,6 +545,44 @@
             return { texture, normalTexture };
         }
 
+        function generateBuildingTexture() {
+            const width = 512;
+            const height = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            // Wall
+            ctx.fillStyle = '#555555';
+            ctx.fillRect(0, 0, width, height);
+
+            // Windows
+            const rows = 8;
+            const cols = 4;
+            const winW = 60;
+            const winH = 40;
+            const padX = (width - cols * winW) / (cols + 1);
+            const padY = (height - rows * winH) / (rows + 1);
+
+            ctx.fillStyle = '#FFFFE0'; // Lit window color
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (Math.random() > 0.3) { // 70% lit
+                        const x = padX + c * (winW + padX);
+                        const y = padY + r * (winH + padY);
+                        ctx.fillRect(x, y, winW, winH);
+                    }
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
         function generateFunnyStationName() {
             const prefixes = ['Great', 'Little', 'Old', 'New', 'Upper', 'Lower', 'Bad', 'Saint', 'Port'];
             const middles = ['Giggle', 'Duck', 'Goose', 'Frog', 'Mouse', 'Cat', 'Dog', 'Bear', 'Thunder', 'Mist', 'Shadow'];
@@ -822,6 +860,7 @@
         let stationWallMaterial, stationFloorMaterial;
         let signalMastMaterial, signalLightRedMaterial, signalLightGreenMaterial, signalBoxRedMaterial, signalBoxGreenMaterial;
         let treeTrunkMaterial, treeFoliageMaterial, cloudMaterial;
+        let buildingMaterial, roadMaterial, pavementMaterial, streetLightMaterial;
         
         // Instanced Meshes für Signale, global zugänglich für Updates
         let signalMastMesh, redLightBoxMesh, greenLightBoxMesh, redLightMesh, greenLightMesh;
@@ -830,6 +869,7 @@
         function init() {
             // Szene
             scene = new THREE.Scene();
+            window.scene = scene; // Expose for debugging/verification
             scene.background = new THREE.Color(0x202020);
             scene.fog = new THREE.Fog(0x202020, 50, 800);
 
@@ -838,6 +878,7 @@
 
             // Gruppe für alle Strecken-Objekte
             trackGroup = new THREE.Group();
+            window.trackGroup = trackGroup; // Expose for debugging/verification
             scene.add(trackGroup);
 
             // Kamera (First-Person)
@@ -1252,6 +1293,20 @@
             treeTrunkMaterial = new THREE.MeshStandardMaterial({ color: 0x5D4037, roughness: 0.9 });
             treeFoliageMaterial = new THREE.MeshStandardMaterial({ color: 0x33691E, roughness: 0.8 });
             cloudMaterial = new THREE.MeshStandardMaterial({ color: 0xDDDDDD, roughness: 0.4, transparent: true, opacity: 0.8 });
+
+            // City Materials
+            const buildingTexture = generateBuildingTexture();
+            buildingMaterial = new THREE.MeshStandardMaterial({
+                map: buildingTexture,
+                emissiveMap: buildingTexture,
+                emissive: 0xffffff,
+                emissiveIntensity: 0.5,
+                roughness: 0.2
+            });
+
+            roadMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 });
+            pavementMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 });
+            streetLightMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xffaa00, emissiveIntensity: 2.0 });
         }
 
 
@@ -1456,6 +1511,8 @@
             // Geometrie für die Strecke erstellen
             createTrackGeometry(trackCurve);
             
+            createBuildings(trackCurve);
+            createCityStreets(trackCurve);
             createTrees(trackCurve);
             createClouds(trackCurve);
 
@@ -1473,6 +1530,99 @@
             tunnelMaterial.normalMap.repeat.x = totalTrackLength / physicalWidthOfOneRepeat; // Auch NormalMap anpassen!
             tunnelMaterial.map.needsUpdate = true;
             tunnelMaterial.normalMap.needsUpdate = true;
+        }
+
+        function createBuildings(curve) {
+            if (!window.envSegments) return;
+
+            let totalLengthCountryside = 0;
+            for (const seg of window.envSegments) {
+                if (seg.type === 'Countryside') {
+                    totalLengthCountryside += (seg.end - seg.start);
+                }
+            }
+            if (totalLengthCountryside === 0) return;
+
+            const density = 0.05; // One building every ~20m (per side)
+            const buildingCount = Math.floor(totalLengthCountryside * density * 2);
+            if (buildingCount === 0) return;
+
+            const buildingGeo = new THREE.BoxGeometry(10, 1, 10); // Base unit, scaled
+            // UV mapping for building texture is handled by BoxGeometry defaults (1 per face).
+            // We might want to tile it? The texture has repeats set.
+            // But texture.repeat affects ALL instances unless we mess with UVs.
+            // For now, simpler is better.
+
+            const buildingMesh = new THREE.InstancedMesh(buildingGeo, buildingMaterial, buildingCount);
+            buildingMesh.castShadow = true;
+            buildingMesh.receiveShadow = true;
+            buildingMesh.frustumCulled = false; // Prevent disappearance when origin is out of view
+
+            const dummy = new THREE.Object3D();
+            const pos = new THREE.Vector3();
+            const tangent = new THREE.Vector3();
+            const up = new THREE.Vector3(0, 1, 0);
+            const binormal = new THREE.Vector3();
+            const normal = new THREE.Vector3();
+
+            let idx = 0;
+
+            for (const seg of window.envSegments) {
+                if (seg.type !== 'Countryside') continue;
+
+                for (let d = seg.start; d < seg.end; d += 20) {
+                    if (d > totalTrackLength) break;
+
+                    const t = d / totalTrackLength;
+                    curve.getPointAt(t, pos);
+                    curve.getTangentAt(t, tangent);
+                    binormal.crossVectors(up, tangent).normalize();
+                    normal.crossVectors(tangent, binormal).normalize();
+
+                    // Left Building
+                    if (idx < buildingCount) {
+                        const dist = 30 + Math.random() * 10;
+                        const groundPos = pos.clone().add(binormal.clone().multiplyScalar(dist)).add(normal.clone().multiplyScalar(-2.0));
+                        // Huge City: Much taller buildings
+                        const height = 60 + Math.random() * 140;
+                        const width = 15 + Math.random() * 15;
+                        const depth = 15 + Math.random() * 15;
+
+                        const bPos = groundPos.clone();
+                        bPos.y += height / 2;
+
+                        dummy.position.copy(bPos);
+                        dummy.rotation.y = Math.atan2(tangent.x, tangent.z);
+                        dummy.scale.set(width/10, height, depth/10);
+                        dummy.updateMatrix();
+                        buildingMesh.setMatrixAt(idx, dummy.matrix);
+                        idx++;
+                    }
+
+                    // Right Building
+                    if (idx < buildingCount) {
+                        const dist = -(30 + Math.random() * 10);
+                        const groundPos = pos.clone().add(binormal.clone().multiplyScalar(dist)).add(normal.clone().multiplyScalar(-2.0));
+                        const height = 60 + Math.random() * 140;
+                        const width = 15 + Math.random() * 15;
+                        const depth = 15 + Math.random() * 15;
+
+                        const bPos = groundPos.clone();
+                        bPos.y += height / 2;
+
+                        dummy.position.copy(bPos);
+                        dummy.rotation.y = Math.atan2(tangent.x, tangent.z);
+                        dummy.scale.set(width/10, height, depth/10);
+                        dummy.updateMatrix();
+                        buildingMesh.setMatrixAt(idx, dummy.matrix);
+                        idx++;
+                    }
+                }
+            }
+
+            buildingMesh.count = idx;
+            buildingMesh.instanceMatrix.needsUpdate = true;
+            trackGroup.add(buildingMesh);
         }
 
         function createTrees(curve) {
@@ -1501,12 +1651,15 @@
             trunkMesh.receiveShadow = true;
             foliageMesh.castShadow = true;
             foliageMesh.receiveShadow = true;
+            trunkMesh.frustumCulled = false;
+            foliageMesh.frustumCulled = false;
 
             const dummy = new THREE.Object3D();
             const pos = new THREE.Vector3();
             const tangent = new THREE.Vector3();
             const up = new THREE.Vector3(0, 1, 0);
             const binormal = new THREE.Vector3();
+            const normal = new THREE.Vector3();
 
             let idx = 0;
 
@@ -1521,12 +1674,13 @@
                      curve.getPointAt(t, pos);
                      curve.getTangentAt(t, tangent);
                      binormal.crossVectors(up, tangent).normalize();
+                     normal.crossVectors(tangent, binormal).normalize();
 
-                     // Left Tree
+                     // Left Tree (Street Trees now - closer to track, regular)
                      if (idx < treeCount) {
-                         const dist = 15 + Math.random() * 20;
-                         const treePos = pos.clone().add(binormal.clone().multiplyScalar(dist));
-                         treePos.y -= 0.5; // Base adjustment
+                         const dist = 12;
+                         // Pavement height is roughly -1.0 relative to track center normal
+                         const treePos = pos.clone().add(binormal.clone().multiplyScalar(dist)).add(normal.clone().multiplyScalar(-1.0));
 
                          dummy.position.copy(treePos);
                          dummy.rotation.set(0, Math.random() * Math.PI, 0);
@@ -1544,9 +1698,8 @@
 
                      // Right Tree
                      if (idx < treeCount) {
-                         const dist = - (15 + Math.random() * 20);
-                         const treePos = pos.clone().add(binormal.clone().multiplyScalar(dist));
-                         treePos.y -= 0.5;
+                         const dist = -12;
+                         const treePos = pos.clone().add(binormal.clone().multiplyScalar(dist)).add(normal.clone().multiplyScalar(-1.0));
 
                          dummy.position.copy(treePos);
                          dummy.rotation.set(0, Math.random() * Math.PI, 0);
@@ -1594,6 +1747,7 @@
 
             cloudMesh.castShadow = false;
             cloudMesh.receiveShadow = false; // Clouds don't receive shadow usually
+            cloudMesh.frustumCulled = false;
 
             const dummy = new THREE.Object3D();
             const pos = new THREE.Vector3();
@@ -1644,6 +1798,166 @@
             cloudMesh.count = idx;
             cloudMesh.instanceMatrix.needsUpdate = true;
             trackGroup.add(cloudMesh);
+        }
+
+        function createCityStreets(curve) {
+            if (!window.envSegments) return;
+
+            // Pavements - 2 side strips
+            // We can generate them in createTrackGeometry or separately.
+            // Separately is fine. We can use InstancedMesh of blocks or Geometry strip.
+            // Geometry strip is smoother for curves.
+
+            for (const seg of window.envSegments) {
+                if (seg.type !== 'Countryside') continue;
+
+                const steps = Math.max(2, Math.floor((seg.end - seg.start) / 2));
+                const pos = new THREE.Vector3();
+                const tangent = new THREE.Vector3();
+                const up = new THREE.Vector3(0, 1, 0);
+                const binormal = new THREE.Vector3();
+                const normal = new THREE.Vector3();
+
+                const leftPavement = [];
+                const rightPavement = [];
+
+                // Create Pavement strips
+                const pWidth = 4.0;
+                const pOffset = 8.0; // Distance from center
+                const pHeight = -1.0;
+
+                for(let i=0; i<=steps; i++) {
+                    const d = seg.start + (i/steps) * (seg.end - seg.start);
+                    if (d > totalTrackLength) break;
+
+                    const t = d / totalTrackLength;
+                    curve.getPointAt(t, pos);
+                    curve.getTangentAt(t, tangent);
+                    binormal.crossVectors(up, tangent).normalize();
+                    normal.crossVectors(tangent, binormal).normalize();
+
+                    // Left Pavement
+                    let p1 = pos.clone().add(binormal.clone().multiplyScalar(pOffset)).add(normal.clone().multiplyScalar(pHeight));
+                    let p2 = pos.clone().add(binormal.clone().multiplyScalar(pOffset + pWidth)).add(normal.clone().multiplyScalar(pHeight));
+                    leftPavement.push(p1.x, p1.y, p1.z);
+                    leftPavement.push(p2.x, p2.y, p2.z);
+
+                    // Right Pavement
+                    p1 = pos.clone().add(binormal.clone().multiplyScalar(-pOffset)).add(normal.clone().multiplyScalar(pHeight));
+                    p2 = pos.clone().add(binormal.clone().multiplyScalar(-(pOffset + pWidth))).add(normal.clone().multiplyScalar(pHeight));
+                    rightPavement.push(p1.x, p1.y, p1.z);
+                    rightPavement.push(p2.x, p2.y, p2.z);
+                }
+
+                // Helper to create strip mesh
+                const createStrip = (vertices) => {
+                    const geom = new THREE.BufferGeometry();
+                    geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                    const uvs = [];
+                    for(let i=0; i<=steps; i++) {
+                        uvs.push(0, i);
+                        uvs.push(1, i);
+                    }
+                    geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+
+                    const indices = [];
+                    for(let i=0; i<steps; i++) {
+                        const base = i*2;
+                        indices.push(base, base+1, base+2);
+                        indices.push(base+1, base+3, base+2);
+                    }
+                    geom.setIndex(indices);
+                    geom.computeVertexNormals();
+                    const mesh = new THREE.Mesh(geom, pavementMaterial);
+                    mesh.receiveShadow = true;
+                    trackGroup.add(mesh);
+                };
+
+                createStrip(leftPavement);
+                createStrip(rightPavement);
+
+                // Add Street Lights (Instanced)
+                // One every 40m
+                const lightCount = Math.floor((seg.end - seg.start) / 40) * 2;
+                if (lightCount > 0) {
+                    const postGeo = new THREE.CylinderGeometry(0.1, 0.1, 5, 6);
+                    const lampGeo = new THREE.BoxGeometry(0.5, 0.2, 1.0); // Arm
+                    const bulbGeo = new THREE.SphereGeometry(0.2, 8, 8);
+
+                    // Use a group-like logic or just place them.
+                    // Merging geometry is efficient. InstancedMesh for parts.
+                    // Let's create one InstancedMesh for posts.
+
+                    const postMesh = new THREE.InstancedMesh(postGeo, streetLightMaterial, lightCount);
+                    const lampMesh = new THREE.InstancedMesh(lampGeo, streetLightMaterial, lightCount);
+
+                    postMesh.castShadow = true;
+                    postMesh.frustumCulled = false;
+                    lampMesh.frustumCulled = false;
+
+                    const dummy = new THREE.Object3D();
+                    let lIdx = 0;
+
+                    for(let d=seg.start; d<seg.end; d+=40) {
+                        if (d > totalTrackLength) break;
+                        const t = d / totalTrackLength;
+                        curve.getPointAt(t, pos);
+                        curve.getTangentAt(t, tangent);
+                        binormal.crossVectors(up, tangent).normalize();
+
+                        // Left Light
+                        if (lIdx < lightCount) {
+                            // Pavement height -1.0
+                            const lPos = pos.clone().add(binormal.clone().multiplyScalar(pOffset + 0.5)).add(normal.clone().multiplyScalar(-1.0));
+                            lPos.y += 2.5; // Height offset for center of pole (height 5)
+
+                            dummy.position.copy(lPos);
+                            dummy.rotation.set(0, 0, 0);
+                            // Align to up vector? No, world Y is up for posts usually.
+                            // But our track tilts. Let's align to track normal?
+                            // For a city, world up is better, but track might be on a hill.
+                            // Let's stick to track normal for coherence.
+                            // Align Y to normal?
+                            // Actually simplified: Just use vertical cylinder.
+                            dummy.updateMatrix();
+                            postMesh.setMatrixAt(lIdx, dummy.matrix);
+
+                            // Lamp arm
+                            const armPos = lPos.clone();
+                            armPos.y += 2.2;
+                            dummy.position.copy(armPos);
+                            dummy.lookAt(pos.clone().add(new THREE.Vector3(0, 5, 0))); // Point inwards
+                            dummy.updateMatrix();
+                            lampMesh.setMatrixAt(lIdx, dummy.matrix);
+
+                            lIdx++;
+                        }
+
+                        // Right Light
+                        if (lIdx < lightCount) {
+                            const lPos = pos.clone().add(binormal.clone().multiplyScalar(-(pOffset + 0.5))).add(normal.clone().multiplyScalar(-1.0));
+                            lPos.y += 2.5;
+
+                            dummy.position.copy(lPos);
+                            dummy.updateMatrix();
+                            postMesh.setMatrixAt(lIdx, dummy.matrix);
+
+                            const armPos = lPos.clone();
+                            armPos.y += 2.2;
+                            dummy.position.copy(armPos);
+                            dummy.lookAt(pos.clone().add(new THREE.Vector3(0, 5, 0)));
+                            dummy.updateMatrix();
+                            lampMesh.setMatrixAt(lIdx, dummy.matrix);
+
+                            lIdx++;
+                        }
+                    }
+                    postMesh.instanceMatrix.needsUpdate = true;
+                    lampMesh.instanceMatrix.needsUpdate = true;
+                    trackGroup.add(postMesh);
+                    trackGroup.add(lampMesh);
+                }
+            }
         }
 
         // --- Strecken-Geometrie ---
@@ -1722,36 +2036,7 @@
                     trackGroup.add(tunnelMesh);
                 } else {
                     // Countryside Ground Strip
-                    // Using TubeGeometry with scale or custom geometry could work.
-                    // For simplicity, let's use a flattened TubeGeometry (half pipe style?)
-                    // Or just a wide flat boxy tube?
-                    const groundRadius = 15.0; // Wide ground
-                    // TubeGeometry always makes a closed tube.
-                    // Let's stick to TubeGeometry but with `countrysideMaterial` and position it lower.
-                    // Actually, a giant tube looks okay as "ground" if we are inside it or on top.
-                    // But we want "open air".
-                    // Let's use a TubeGeometry but huge radius so it looks flat? No.
-
-                    // Let's make a Ribbon Geometry manually for Countryside
-                    // Or use TubeGeometry with a modified shape? No easy way.
-
-                    // Simple hack: Use TubeGeometry but large radius, positioned way down?
-                    // Or just use the TubeGeometry but with BackSide (so we are inside) and Sky visible above?
-                    // If we use TubeGeometry, we have walls.
-                    // We want NO walls.
-
-                    // Let's create a custom ribbon mesh.
-                    const width = 40;
-                    const ribbonGeo = new THREE.PlaneGeometry(width, seg.end - seg.start, 1, segTubularSegments);
-                    // Modify vertices to follow curve? That's complex.
-
-                    // Easier: TubeGeometry but use a material that is transparent/invisible on top?
-                    // Or just use TubeGeometry and don't care about walls? The user wants "country side".
-                    // That implies seeing the sky.
-
-                    // Best approach: TubeGeometry with `Side: BackSide` is standard tunnel.
-                    // For countryside, we can generate a "Ground" mesh which is just a strip.
-                    // Let's iterate and build a BufferGeometry.
+                    // Use roadMaterial for City Streets (Ground)
 
                     const geom = new THREE.BufferGeometry();
                     const vertices = [];
@@ -1790,7 +2075,8 @@
                     geom.setIndex(indices);
                     geom.computeVertexNormals();
 
-                    const groundMesh = new THREE.Mesh(geom, countrysideMaterial);
+                    // Use roadMaterial instead of countrysideMaterial (which was grass)
+                    const groundMesh = new THREE.Mesh(geom, roadMaterial);
                     groundMesh.receiveShadow = true;
                     trackGroup.add(groundMesh);
                 }
@@ -3135,6 +3421,8 @@
 
                         // 6. Geometrie basierend auf der geladenen Kurve neu aufbauen
                         createTrackGeometry(trackCurve);
+                        createBuildings(trackCurve);
+                        createCityStreets(trackCurve);
                         createTrees(trackCurve);
                         createClouds(trackCurve);
                         createStations(trackCurve);
