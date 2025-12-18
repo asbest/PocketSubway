@@ -788,7 +788,7 @@
         let MAX_BRAKE_FORCE = BASE_MAX_BRAKE_FORCE;
         const FRICTION_COEFFICIENT = 150; 
         const GRAVITY = 9.81;
-        let MAX_SPEED = BASE_MAX_SPEED;
+        window.MAX_SPEED = BASE_MAX_SPEED; // Exposed for cheat/debug
 
         // Strecken-Generierung
         const stations = [];
@@ -2959,6 +2959,33 @@
                 }
             });
 
+            // Cheat code: 10 schnelle Klicks auf die Geschwindigkeitsanzeige setzt MaxSpeed auf 1000
+            let speedClickCount = 0;
+            let lastSpeedClickTime = 0;
+            ui.speedDisplay.parentElement.addEventListener('click', () => {
+                const now = Date.now();
+                if (now - lastSpeedClickTime > 400) {
+                    speedClickCount = 0;
+                }
+                lastSpeedClickTime = now;
+                speedClickCount++;
+
+                if (speedClickCount >= 10) {
+                    window.MAX_SPEED = 1000; // Set cheat max speed
+                    speedClickCount = 0;
+
+                    // Visuelles Feedback
+                    const speedContainer = ui.speedDisplay.parentElement;
+                    speedContainer.style.transition = 'transform 0.1s ease-in-out';
+                    speedContainer.style.transform = 'scale(1.2)';
+                    speedContainer.classList.add('text-red-500'); // Optional: Farbe ändern für Feedback
+                    setTimeout(() => {
+                        speedContainer.style.transform = 'scale(1)';
+                        speedContainer.classList.remove('text-red-500');
+                    }, 200);
+                }
+            });
+
             // Upgrade-Menü-Steuerung
             ui.upgradesButton.addEventListener('click', () => {
                 // This button (the new icon) pauses the game and shows the upgrade menu.
@@ -3185,7 +3212,7 @@
         function applyUpgrades() {
             MAX_THROTTLE_FORCE = BASE_MAX_THROTTLE_FORCE * (1 + (accelerationLevel - 1) * 0.15); // +15% pro Level
             MAX_BRAKE_FORCE = BASE_MAX_BRAKE_FORCE * (1 + (brakingLevel - 1) * 0.15);       // +15% pro Level
-            MAX_SPEED = BASE_MAX_SPEED * (1 + (maxSpeedLevel - 1) * 0.1);                   // +10% pro Level
+            window.MAX_SPEED = BASE_MAX_SPEED * (1 + (maxSpeedLevel - 1) * 0.1);                   // +10% pro Level
             scoreMultiplier = 1 + (scoreMultiplierLevel - 1) * 0.25;                       // +25% pro Level
         }
 
@@ -3619,7 +3646,7 @@
             } else if (window.playerSpeed < 0) {
                 window.playerSpeed = 0;
             }
-            if (window.playerSpeed > MAX_SPEED) window.playerSpeed = MAX_SPEED;
+            if (window.playerSpeed > window.MAX_SPEED) window.playerSpeed = window.MAX_SPEED;
             
             playerDistance += window.playerSpeed * dt;
 
@@ -3638,7 +3665,7 @@
                 const now = Tone.now();
                 const minEngineFreq = 80;
                 const maxEngineFreq = 400;
-                const speedRatio = window.playerSpeed / MAX_SPEED;
+                const speedRatio = window.playerSpeed / window.MAX_SPEED;
 
                 // Tatsächliche Beschleunigung berechnen
                 const actualAcceleration = (window.playerSpeed - oldSpeed) / dt;
