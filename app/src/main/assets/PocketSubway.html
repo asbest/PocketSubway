@@ -3820,7 +3820,7 @@
 
             // Dynamisches FOV basierend auf Geschwindigkeit
             const baseFOV = 30;
-            const maxFOVIncrease = 20; // Maximal +20 Grad bei Max Speed
+            const maxFOVIncrease = 10; // Maximal +10 Grad bei Max Speed
             const targetFOV = baseFOV + (window.playerSpeed / window.MAX_SPEED) * maxFOVIncrease;
             // Sanftes Überblenden des FOV
             camera.fov += (targetFOV - camera.fov) * 0.1;
