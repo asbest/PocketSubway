@@ -124,6 +124,9 @@
                 <button id="achievements-button" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
                     Daily Tasks
                 </button>
+                <button id="track-gen-button" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
+                    Track Generator
+                </button>
 
                 <!-- Settings -->
                 <div class="flex space-x-8 mt-8 justify-center">
@@ -221,6 +224,55 @@
             <button id="close-achievements-menu-button" class="mt-8 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-lg text-xl">
                 Back
             </button>
+        </div>
+
+        <div id="track-gen-menu" class="hidden w-full max-w-2xl mx-auto">
+            <h1 class="text-4xl font-bold mb-6 text-center">TRACK GENERATOR</h1>
+            <div class="bg-black bg-opacity-50 p-6 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-outside-freq" class="text-sm font-bold">Outside Frequency</label>
+                    <input type="range" id="gen-outside-freq" min="0" max="100" value="50" class="w-full accent-indigo-500">
+                    <p id="gen-outside-freq-val" class="text-right font-mono text-xs">50%</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-station-freq" class="text-sm font-bold">Station Frequency</label>
+                    <input type="range" id="gen-station-freq" min="0" max="100" value="20" class="w-full accent-indigo-500">
+                    <p id="gen-station-freq-val" class="text-right font-mono text-xs">20%</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-curvature" class="text-sm font-bold">Max Curvature</label>
+                    <input type="range" id="gen-curvature" min="1" max="10" value="5" class="w-full accent-indigo-500">
+                    <p id="gen-curvature-val" class="text-right font-mono text-xs">0.005</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-track-len" class="text-sm font-bold">Track Length</label>
+                    <input type="range" id="gen-track-len" min="10" max="200" value="50" class="w-full accent-indigo-500">
+                    <p id="gen-track-len-val" class="text-right font-mono text-xs">50</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-mountain-dens" class="text-sm font-bold">Mountain Density</label>
+                    <input type="range" id="gen-mountain-dens" min="0" max="100" value="20" class="w-full accent-indigo-500">
+                    <p id="gen-mountain-dens-val" class="text-right font-mono text-xs">20%</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-building-dens" class="text-sm font-bold">Building Density</label>
+                    <input type="range" id="gen-building-dens" min="0" max="100" value="50" class="w-full accent-indigo-500">
+                    <p id="gen-building-dens-val" class="text-right font-mono text-xs">50%</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-tree-dens" class="text-sm font-bold">Tree Density</label>
+                    <input type="range" id="gen-tree-dens" min="0" max="100" value="50" class="w-full accent-indigo-500">
+                    <p id="gen-tree-dens-val" class="text-right font-mono text-xs">50%</p>
+                </div>
+            </div>
+            <div class="flex flex-col items-center mt-6 space-y-4">
+                <button id="apply-track-gen" class="w-full max-w-sm bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-xl transition-transform transform hover:scale-105">
+                    Apply & Restart
+                </button>
+                <button id="close-track-gen" class="w-full max-w-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg text-lg transition-transform transform hover:scale-105">
+                    Return
+                </button>
+            </div>
         </div>
     </div>
 
@@ -743,6 +795,16 @@
         window.playerDistance = 0; // Die vom Spieler zurückgelegte Distanz auf der Strecke in Metern.
         window.playerSpeed = 0; // Die aktuelle Geschwindigkeit des Zuges in Metern pro Sekunde.
 
+        window.trackConfig = {
+            numSegments: 50,
+            maxCurvature: 0.001,
+            outsideFrequency: 0.5,
+            stationFrequency: 0.2,
+            mountainDensity: 0.02,
+            buildingDensity: 0.05,
+            treeDensity: 0.05
+        };
+
         // Sound-Variablen
         let engineSound; // Das Tone.js-Objekt für das Motorgeräusch.
         let brakeSound; // Das Tone.js-Objekt für das Bremsgeräusch.
@@ -795,11 +857,11 @@
         // Strecken-Generierung
         const stations = [];
         const signals = [];
-        const NUM_SEGMENTS = 50;
+        let NUM_SEGMENTS = 50;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
         const STATION_LENGTH = 200; 
-        const MAX_CURVATURE = 0.001; 
+        let MAX_CURVATURE = 0.001;
         const MAX_INCLINE_RATE = 0.0005; 
         const MAX_GRADE = 0.025; 
         const TUBE_SEGMENTS = 900;
@@ -855,6 +917,26 @@
             buyMaxSpeedButton: document.getElementById('buy-max-speed'),
             scoreMultiplierLevelDisplay: document.getElementById('score-multiplier-level'),
             buyScoreMultiplierButton: document.getElementById('buy-score-multiplier'),
+
+            // Track Gen UI
+            trackGenButton: document.getElementById('track-gen-button'),
+            trackGenMenu: document.getElementById('track-gen-menu'),
+            applyTrackGenButton: document.getElementById('apply-track-gen'),
+            closeTrackGenButton: document.getElementById('close-track-gen'),
+            genOutsideFreq: document.getElementById('gen-outside-freq'),
+            genOutsideFreqVal: document.getElementById('gen-outside-freq-val'),
+            genStationFreq: document.getElementById('gen-station-freq'),
+            genStationFreqVal: document.getElementById('gen-station-freq-val'),
+            genCurvature: document.getElementById('gen-curvature'),
+            genCurvatureVal: document.getElementById('gen-curvature-val'),
+            genMountainDens: document.getElementById('gen-mountain-dens'),
+            genMountainDensVal: document.getElementById('gen-mountain-dens-val'),
+            genBuildingDens: document.getElementById('gen-building-dens'),
+            genBuildingDensVal: document.getElementById('gen-building-dens-val'),
+            genTreeDens: document.getElementById('gen-tree-dens'),
+            genTreeDensVal: document.getElementById('gen-tree-dens-val'),
+            genTrackLen: document.getElementById('gen-track-len'),
+            genTrackLenVal: document.getElementById('gen-track-len-val'),
         };
 
         // Materialien für prozedurale Texturen (generiert bei Init)
@@ -900,9 +982,9 @@
 
             // Auflösung, Stärke, Radius, Threshold
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = 0.2; // Ab welcher Helligkeit Bloom wirkt
-            bloomPass.strength = 0.8;  // Wie stark das Leuchten ist
-            bloomPass.radius = 0.5;    // Wie weit das Leuchten streut
+            bloomPass.threshold = 0.85; // Increased threshold to prevent general scenery from blooming
+            bloomPass.strength = 1.2;   // Slightly stronger but more selective bloom
+            bloomPass.radius = 0.4;    // Tighter glow
 
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
@@ -943,7 +1025,7 @@
             const beamMat = new THREE.MeshBasicMaterial({
                 color: 0xffffee,
                 transparent: true,
-                opacity: 0.1,
+                opacity: 0.05,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 side: THREE.DoubleSide
@@ -975,6 +1057,15 @@
             
             // Daily Achievements initialisieren
             initializeDailyAchievements();
+
+            // Load trackConfig if available
+            const savedState = localStorage.getItem('pocketSubwaySave');
+            if (savedState) {
+                const state = JSON.parse(savedState);
+                if (state.trackConfig) {
+                    window.trackConfig = state.trackConfig;
+                }
+            }
 
             // Stats initialisieren und hinzufügen - FPS Counter wird nicht mehr genutzt
             // stats = new Stats();
@@ -1174,9 +1265,11 @@
             stainNormal.wrapS = THREE.RepeatWrapping;
             stainNormal.wrapT = THREE.RepeatWrapping;
 
-            // Less repetition for a stained look
-            stainTexture.repeat.set(1, 4);
-            stainNormal.repeat.set(1, 4);
+            // Initial repeat for world-space UVs (y=4 means 4 repeats around circumference)
+            const tunnelCircumference = 2 * Math.PI * 5.0;
+            const physicalHeightOfOneRepeat = tunnelCircumference / 4;
+            stainTexture.repeat.set(1 / physicalHeightOfOneRepeat, 4);
+            stainNormal.repeat.set(1 / physicalHeightOfOneRepeat, 4);
 
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
                 map: stainTexture,
@@ -1339,6 +1432,11 @@
 
         // --- Strecken-Generierung ---
         function buildProceduralTrack() {
+            if (window.trackConfig) {
+                NUM_SEGMENTS = window.trackConfig.numSegments;
+                MAX_CURVATURE = window.trackConfig.maxCurvature;
+            }
+
             const points = [];
             let currentPos = new THREE.Vector3(0, 0, 0); 
             let currentDir = new THREE.Vector3(0, 0, -1); 
@@ -1423,12 +1521,19 @@
 
             let currentEnvType = 'Tunnel';
             let stationsInCurrentEnv = 1; // Start station counts as 1
-            let targetStationsInEnv = Math.floor(Math.random() * 6) + 5; // 5 to 10 stations for first tunnel
+
+            const outsideFreq = window.trackConfig ? window.trackConfig.outsideFrequency : 0.5;
+            const stationFreq = window.trackConfig ? window.trackConfig.stationFrequency : 0.2;
+
+            let targetStationsInEnv = currentEnvType === 'Tunnel' ?
+                Math.max(1, Math.round(10 * (1 - outsideFreq))) :
+                Math.max(1, Math.round(10 * outsideFreq));
+
             let lastEnvChangeDist = 0;
 
             // --- 3. Restliche Strecke prozedural generieren ---
             for (let i = 1; i < NUM_SEGMENTS; i++) { 
-                const isStation = Math.random() < 0.2 && !lastWasStation; 
+                const isStation = Math.random() < stationFreq && !lastWasStation;
                 
                 if (isStation) {
                     segmentLength = STATION_LENGTH;
@@ -1502,20 +1607,27 @@
                     stationsInCurrentEnv++;
                     if (stationsInCurrentEnv >= targetStationsInEnv) {
                         // Switch environment after this station
+                        let theme = 'Default';
+                        if (currentEnvType === 'Countryside') {
+                            const themes = ['Urban', 'Rural', 'Mixed'];
+                            theme = themes[Math.floor(Math.random() * themes.length)];
+                        }
+
                         window.envSegments.push({
                             start: lastEnvChangeDist,
                             end: totalTrackLength,
-                            type: currentEnvType
+                            type: currentEnvType,
+                            theme: theme
                         });
 
                         lastEnvChangeDist = totalTrackLength;
 
                         if (currentEnvType === 'Tunnel') {
                             currentEnvType = 'Countryside';
-                            targetStationsInEnv = 2; // Countryside always 2 stations
+                            targetStationsInEnv = Math.max(1, Math.round(10 * outsideFreq));
                         } else {
                             currentEnvType = 'Tunnel';
-                            targetStationsInEnv = Math.floor(Math.random() * 6) + 5; // Tunnel 5-10 stations
+                            targetStationsInEnv = Math.max(1, Math.round(10 * (1 - outsideFreq)));
                         }
 
                         stationsInCurrentEnv = 0;
@@ -1524,10 +1636,16 @@
             }
 
             // Add final segment
+            let finalTheme = 'Default';
+            if (currentEnvType === 'Countryside') {
+                const themes = ['Urban', 'Rural', 'Mixed'];
+                finalTheme = themes[Math.floor(Math.random() * themes.length)];
+            }
             window.envSegments.push({
                 start: lastEnvChangeDist,
                 end: totalTrackLength,
-                type: currentEnvType
+                type: currentEnvType,
+                theme: finalTheme
             });
 
 
@@ -1541,6 +1659,7 @@
             createBuildings(trackCurve);
             createCityStreets(trackCurve);
             createTrees(trackCurve);
+            createMountains(trackCurve);
             createClouds(trackCurve);
 
             // Bahnhöfe erstellen
@@ -1549,12 +1668,12 @@
             // Signale erstellen
             createSignals(trackCurve);
 
-            // Passe die Wiederholung der Ziegeltextur an die tatsächliche Streckenlänge an
+            // Passe die Wiederholung der Ziegeltextur an (Weltraum-UVs verwendet)
             const tunnelCircumference = 2 * Math.PI * 5.0; // tunnelRadius = 5.0
             const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
-            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Assume square bricks for now
-            tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
-            tunnelMaterial.normalMap.repeat.x = totalTrackLength / physicalWidthOfOneRepeat; // Auch NormalMap anpassen!
+            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
+            tunnelMaterial.map.repeat.x = 1 / physicalWidthOfOneRepeat;
+            tunnelMaterial.normalMap.repeat.x = 1 / physicalWidthOfOneRepeat;
             tunnelMaterial.map.needsUpdate = true;
             tunnelMaterial.normalMap.needsUpdate = true;
         }
@@ -1570,7 +1689,7 @@
             }
             if (totalLengthCountryside === 0) return;
 
-            const density = 0.05; // One building every ~20m (per side)
+            const density = window.trackConfig ? window.trackConfig.buildingDensity : 0.05; // One building every ~20m (per side)
             const buildingCount = Math.floor(totalLengthCountryside * density * 2);
             if (buildingCount === 0) return;
 
@@ -1597,7 +1716,11 @@
             for (const seg of window.envSegments) {
                 if (seg.type !== 'Countryside') continue;
 
-                for (let d = seg.start; d < seg.end; d += 20) {
+                let segDensity = density;
+                if (seg.theme === 'Rural') segDensity *= 0.2;
+                else if (seg.theme === 'Mixed') segDensity *= 0.6;
+
+                for (let d = seg.start; d < seg.end; d += (segDensity > 0 ? (1 / (segDensity * 2)) : 1000000)) {
                     if (d > totalTrackLength) break;
 
                     const t = d / totalTrackLength;
@@ -1664,7 +1787,7 @@
 
             if (totalLengthCountryside === 0) return;
 
-            const density = 0.05; // 1 tree every 20m per side approx
+            const density = window.trackConfig ? window.trackConfig.treeDensity : 0.05; // 1 tree every 20m per side approx
             const treeCount = Math.floor(totalLengthCountryside * density * 2);
             if (treeCount === 0) return;
 
@@ -1693,7 +1816,11 @@
             for (const seg of window.envSegments) {
                 if (seg.type !== 'Countryside') continue;
 
-                for (let d = seg.start; d < seg.end; d += 20) {
+                let segDensity = density;
+                if (seg.theme === 'Urban') segDensity *= 0.3;
+                else if (seg.theme === 'Mixed') segDensity *= 0.7;
+
+                for (let d = seg.start; d < seg.end; d += (segDensity > 0 ? (1 / (segDensity * 2)) : 1000000)) {
                      // Check if not too close to totalTrackLength to avoid wrap issues
                      if (d > totalTrackLength) break;
 
@@ -1751,6 +1878,81 @@
 
             trackGroup.add(trunkMesh);
             trackGroup.add(foliageMesh);
+        }
+
+        function createMountains(curve) {
+            if (!window.envSegments) return;
+
+            let totalLengthCountryside = 0;
+            for (const seg of window.envSegments) {
+                if (seg.type === 'Countryside') {
+                    totalLengthCountryside += (seg.end - seg.start);
+                }
+            }
+            if (totalLengthCountryside === 0) return;
+
+            const density = window.trackConfig ? window.trackConfig.mountainDensity : 0.02;
+            const mountainCount = Math.floor(totalLengthCountryside * density);
+            if (mountainCount === 0) return;
+
+            const mountainGeo = new THREE.ConeGeometry(50, 100, 4); // Low-poly pyramid-like mountains
+            const mountainMat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.1 });
+            const mountainMesh = new THREE.InstancedMesh(mountainGeo, mountainMat, mountainCount);
+
+            const mountainColors = [0x4a4a4a, 0x5a5a5a, 0x3d3d3d, 0x4e443d, 0x5c504a].map(c => new THREE.Color(c));
+
+            mountainMesh.castShadow = true;
+            mountainMesh.receiveShadow = true;
+            mountainMesh.frustumCulled = false;
+
+            const dummy = new THREE.Object3D();
+            const pos = new THREE.Vector3();
+            const tangent = new THREE.Vector3();
+            const up = new THREE.Vector3(0, 1, 0);
+            const binormal = new THREE.Vector3();
+            const normal = new THREE.Vector3();
+
+            let idx = 0;
+            for (const seg of window.envSegments) {
+                if (seg.type !== 'Countryside') continue;
+
+                let segDensity = density;
+                if (seg.theme === 'Urban') segDensity *= 0.1; // Fewer mountains in big cities
+
+                for (let d = seg.start; d < seg.end; d += (segDensity > 0 ? (1 / segDensity) : 1000000)) {
+                    if (d > totalTrackLength || idx >= mountainCount) break;
+
+                    const t = d / totalTrackLength;
+                    curve.getPointAt(t, pos);
+                    curve.getTangentAt(t, tangent);
+                    binormal.crossVectors(up, tangent).normalize();
+                    normal.crossVectors(tangent, binormal).normalize();
+
+                    const side = Math.random() > 0.5 ? 1 : -1;
+                    const dist = side * (150 + Math.random() * 100);
+                    const mountainPos = pos.clone().add(binormal.clone().multiplyScalar(dist)).add(normal.clone().multiplyScalar(-10));
+
+                    const height = 80 + Math.random() * 120;
+                    const radius = 40 + Math.random() * 40;
+
+                    dummy.position.copy(mountainPos);
+                    dummy.position.y += height / 2;
+                    dummy.rotation.y = Math.random() * Math.PI;
+                    dummy.scale.set(radius / 50, height / 100, radius / 50);
+                    dummy.updateMatrix();
+                    mountainMesh.setMatrixAt(idx, dummy.matrix);
+
+                    const color = mountainColors[Math.floor(Math.random() * mountainColors.length)];
+                    mountainMesh.setColorAt(idx, color);
+
+                    idx++;
+                }
+            }
+
+            mountainMesh.count = idx;
+            mountainMesh.instanceMatrix.needsUpdate = true;
+            mountainMesh.instanceColor.needsUpdate = true;
+            trackGroup.add(mountainMesh);
         }
 
         function createClouds(curve) {
@@ -1830,13 +2032,19 @@
         function createCityStreets(curve) {
             if (!window.envSegments) return;
 
-            // Pavements - 2 side strips
-            // We can generate them in createTrackGeometry or separately.
-            // Separately is fine. We can use InstancedMesh of blocks or Geometry strip.
-            // Geometry strip is smoother for curves.
-
             for (const seg of window.envSegments) {
                 if (seg.type !== 'Countryside') continue;
+
+                let pavementVisible = true;
+                let lightSpacing = 40;
+
+                if (seg.theme === 'Rural') {
+                    pavementVisible = false;
+                    lightSpacing = 200; // Very sparse
+                } else if (seg.theme === 'Mixed') {
+                    pavementVisible = Math.random() > 0.5;
+                    lightSpacing = 80;
+                }
 
                 const steps = Math.max(2, Math.floor((seg.end - seg.start) / 2));
                 const pos = new THREE.Vector3();
@@ -1900,12 +2108,13 @@
                     trackGroup.add(mesh);
                 };
 
-                createStrip(leftPavement);
-                createStrip(rightPavement);
+                if (pavementVisible) {
+                    createStrip(leftPavement);
+                    createStrip(rightPavement);
+                }
 
                 // Add Street Lights (Instanced)
-                // One every 40m
-                const lightCount = Math.floor((seg.end - seg.start) / 40) * 2;
+                const lightCount = Math.floor((seg.end - seg.start) / lightSpacing) * 2;
                 if (lightCount > 0) {
                     const postGeo = new THREE.CylinderGeometry(0.1, 0.1, 5, 6);
                     const lampGeo = new THREE.BoxGeometry(0.5, 0.2, 1.0); // Arm
@@ -1925,7 +2134,7 @@
                     const dummy = new THREE.Object3D();
                     let lIdx = 0;
 
-                    for(let d=seg.start; d<seg.end; d+=40) {
+                    for(let d=seg.start; d<seg.end; d+=lightSpacing) {
                         if (d > totalTrackLength) break;
                         const t = d / totalTrackLength;
                         curve.getPointAt(t, pos);
@@ -2058,6 +2267,15 @@
 
                 if (seg.type === 'Tunnel') {
                     const tunnelGeometry = new THREE.TubeGeometry(segCurve, segTubularSegments, tunnelRadius, 32, false);
+
+                    // Adjust UVs for consistent world-space tiling along the length
+                    const uvAttr = tunnelGeometry.attributes.uv;
+                    for (let i = 0; i < uvAttr.count; i++) {
+                        const u = uvAttr.getX(i);
+                        const worldDist = seg.start + u * (seg.end - seg.start);
+                        uvAttr.setX(i, worldDist);
+                    }
+
                     const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
                     tunnelMesh.receiveShadow = true;
                     trackGroup.add(tunnelMesh);
@@ -2982,6 +3200,69 @@
                 ui.mainPauseMenu.classList.remove('hidden');
             });
 
+            // Track Gen Menu Listeners
+            ui.trackGenButton.addEventListener('click', () => {
+                if (!isPaused) togglePause();
+                ui.mainPauseMenu.classList.add('hidden');
+                ui.trackGenMenu.classList.remove('hidden');
+
+                // Set initial values from trackConfig
+                ui.genOutsideFreq.value = window.trackConfig.outsideFrequency * 100;
+                ui.genOutsideFreqVal.innerText = (window.trackConfig.outsideFrequency * 100).toFixed(0) + '%';
+                ui.genStationFreq.value = window.trackConfig.stationFrequency * 100;
+                ui.genStationFreqVal.innerText = (window.trackConfig.stationFrequency * 100).toFixed(0) + '%';
+                ui.genCurvature.value = window.trackConfig.maxCurvature * 1000;
+                ui.genCurvatureVal.innerText = (window.trackConfig.maxCurvature).toFixed(3);
+                ui.genMountainDens.value = window.trackConfig.mountainDensity * 1000; // Scaled for slider
+                ui.genMountainDensVal.innerText = (window.trackConfig.mountainDensity * 100).toFixed(1) + '%';
+                ui.genBuildingDens.value = window.trackConfig.buildingDensity * 1000;
+                ui.genBuildingDensVal.innerText = (window.trackConfig.buildingDensity * 100).toFixed(1) + '%';
+                ui.genTreeDens.value = window.trackConfig.treeDensity * 1000;
+                ui.genTreeDensVal.innerText = (window.trackConfig.treeDensity * 100).toFixed(1) + '%';
+                ui.genTrackLen.value = window.trackConfig.numSegments;
+                ui.genTrackLenVal.innerText = window.trackConfig.numSegments;
+            });
+
+            ui.closeTrackGenButton.addEventListener('click', () => {
+                ui.trackGenMenu.classList.add('hidden');
+                ui.mainPauseMenu.classList.remove('hidden');
+            });
+
+            ui.genOutsideFreq.addEventListener('input', (e) => {
+                ui.genOutsideFreqVal.innerText = e.target.value + '%';
+            });
+            ui.genStationFreq.addEventListener('input', (e) => {
+                ui.genStationFreqVal.innerText = e.target.value + '%';
+            });
+            ui.genCurvature.addEventListener('input', (e) => {
+                ui.genCurvatureVal.innerText = (e.target.value / 1000).toFixed(3);
+            });
+            ui.genMountainDens.addEventListener('input', (e) => {
+                ui.genMountainDensVal.innerText = (e.target.value / 10).toFixed(1) + '%';
+            });
+            ui.genBuildingDens.addEventListener('input', (e) => {
+                ui.genBuildingDensVal.innerText = (e.target.value / 10).toFixed(1) + '%';
+            });
+            ui.genTreeDens.addEventListener('input', (e) => {
+                ui.genTreeDensVal.innerText = (e.target.value / 10).toFixed(1) + '%';
+            });
+            ui.genTrackLen.addEventListener('input', (e) => {
+                ui.genTrackLenVal.innerText = e.target.value;
+            });
+
+            ui.applyTrackGenButton.addEventListener('click', () => {
+                window.trackConfig.outsideFrequency = ui.genOutsideFreq.value / 100;
+                window.trackConfig.stationFrequency = ui.genStationFreq.value / 100;
+                window.trackConfig.maxCurvature = ui.genCurvature.value / 1000;
+                window.trackConfig.mountainDensity = ui.genMountainDens.value / 1000;
+                window.trackConfig.buildingDensity = ui.genBuildingDens.value / 1000;
+                window.trackConfig.treeDensity = ui.genTreeDens.value / 1000;
+                window.trackConfig.numSegments = parseInt(ui.genTrackLen.value);
+
+                saveGame();
+                window.location.reload();
+            });
+
             ui.restartButton.addEventListener('click', () => {
                 window.location.reload();
             });
@@ -3136,15 +3417,13 @@
             newNormalMap.wrapS = THREE.RepeatWrapping;
             newNormalMap.wrapT = THREE.RepeatWrapping;
 
-            // Recalculate repeat X based on track length logic
+            // Recalculate repeat X based on world-space UVs
             const tunnelCircumference = 2 * Math.PI * 5.0;
             const physicalHeightOfOneRepeat = tunnelCircumference / repeatY;
             const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Square aspect for texture tiles
 
-            const repeatX = totalTrackLength > 0 ? totalTrackLength / physicalWidthOfOneRepeat : 1;
-
-            newMap.repeat.set(repeatX, repeatY);
-            newNormalMap.repeat.set(repeatX, repeatY);
+            newMap.repeat.set(1 / physicalWidthOfOneRepeat, repeatY);
+            newNormalMap.repeat.set(1 / physicalWidthOfOneRepeat, repeatY);
 
             // Update Material
             tunnelMaterial.map = newMap;
@@ -3343,7 +3622,7 @@
             try {
                 // Umfassenderer Spielzustand
                 const gameState = {
-                    saveVersion: 4, // Version erhöht
+                    saveVersion: 5, // Version erhöht
 
                     // Spieler-Zustand
                     playerDistance: window.playerDistance,
@@ -3380,6 +3659,8 @@
                     // Pünktlichkeits-Zustand
                     scheduleTime: scheduleTime,
                     isScheduleTimerActive: scheduleTimer !== null,
+
+                    trackConfig: window.trackConfig,
                 };
 
                 const gameStateJSON = JSON.stringify(gameState);
@@ -3445,6 +3726,10 @@
                         // --- Laden des neuen, vollständigen Spielstands (v3+) ---
 
                         // Achievements Laden
+                        if (gameState.saveVersion >= 5 && gameState.trackConfig) {
+                            window.trackConfig = gameState.trackConfig;
+                        }
+
                         if (gameState.saveVersion >= 4 && gameState.dailyAchievements) {
                             dailyAchievements = gameState.dailyAchievements;
                             totalDistanceTraveled = gameState.totalDistanceTraveled || 0;
@@ -3511,13 +3796,14 @@
                         createBuildings(trackCurve);
                         createCityStreets(trackCurve);
                         createTrees(trackCurve);
+                        createMountains(trackCurve);
                         createClouds(trackCurve);
                         createStations(trackCurve);
                         createSignals(trackCurve);
                         const tunnelCircumference = 2 * Math.PI * 5.0;
                         const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
                         const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
-                        tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
+                        tunnelMaterial.map.repeat.x = 1 / physicalWidthOfOneRepeat;
                         tunnelMaterial.map.needsUpdate = true;
 
                         // 7. Pünktlichkeits-Zustand wiederherstellen
@@ -3617,19 +3903,19 @@
         }
 
         // --- Environment Update ---
-        function updateEnvironment() {
+        const updateEnvironment = window.updateEnvironment = function() {
             const currentType = getEnvTypeAt(playerDistance);
 
             // Define target values
-            const targetFogColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd); // Muted Blue-Grey
-            const targetFogNear = currentType === 'Tunnel' ? 50 : 200;
-            const targetFogFar = currentType === 'Tunnel' ? 800 : 3000;
-            const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
+            const targetFogColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x182028); // Deeper contrast for countryside
+            const targetFogNear = currentType === 'Tunnel' ? 50 : 500;
+            const targetFogFar = currentType === 'Tunnel' ? 800 : 3500;
+            const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x182028);
 
             // Light Intensity & Color Targets
-            const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.1;
-            const targetSkyColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
-            const targetGroundColor = currentType === 'Tunnel' ? new THREE.Color(0x101010) : new THREE.Color(0x554433);
+            const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.08;
+            const targetSkyColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x202830);
+            const targetGroundColor = currentType === 'Tunnel' ? new THREE.Color(0x101010) : new THREE.Color(0x050505);
 
             // Lerp values
             const lerpFactor = 0.02;
