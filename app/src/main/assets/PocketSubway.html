@@ -2695,10 +2695,15 @@
                 const headGeo = new THREE.SphereGeometry(0.18, 16, 12);
                 const torsoGeo = new THREE.CylinderGeometry(0.2, 0.3, 0.6, 12);
                 const upperLegGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.4, 8);
+                upperLegGeo.translate(0, -0.2, 0);
                 const lowerLegGeo = new THREE.CylinderGeometry(0.1, 0.07, 0.4, 8);
+                lowerLegGeo.translate(0, -0.2, 0);
                 const upperArmGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.35, 8);
+                upperArmGeo.translate(0, -0.175, 0);
                 const lowerArmGeo = new THREE.CylinderGeometry(0.07, 0.06, 0.35, 8);
+                lowerArmGeo.translate(0, -0.175, 0);
                 const footGeo = new THREE.BoxGeometry(0.18, 0.08, 0.3);
+                footGeo.translate(0, -0.04, 0.08);
                 const hairGeo = new THREE.SphereGeometry(0.15, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2); // Halbkugel für Haare
                 const eyeGeo = new THREE.SphereGeometry(0.03, 8, 8);
                 const mouthGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.02, 12, 1, false, 0, Math.PI); // Halb-Zylinder für Mund
@@ -2928,7 +2933,7 @@
                     // 5. Apply this transformation to all body part instances
                     const { headMesh, torsoMesh, upperArmLMesh, lowerArmLMesh, upperArmRMesh, lowerArmRMesh, upperLegLMesh, lowerLegLMesh, upperLegRMesh, lowerLegRMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh } = station.bodyMeshes;
 
-                    const setPartMatrix = (mesh, x, y, z, sX = 1, sY = 1, sZ = 1, rotX = 0, rotY = 0, rotZ = 0) => {
+                    const setPartMatrix = (mesh, x, y, z, rotX = 0, rotY = 0, rotZ = 0, sX = 1, sY = 1, sZ = 1) => {
                         _partDummy.position.set(x * person.scaleW, y * person.scaleH, z * person.scaleW);
                         _partDummy.scale.set(sX * person.scaleW, sY * person.scaleH, sZ * person.scaleW);
                         _partDummy.rotation.set(rotX, rotY, rotZ);
@@ -2937,52 +2942,74 @@
                         mesh.setMatrixAt(person.id, _finalPartMatrix);
                     };
 
+                    const getChildMatrix = (mesh, parentX, parentY, parentZ, parentRotX, parentRotY, parentRotZ, childX, childY, childZ, childRotX, childRotY, childRotZ, sX = 1, sY = 1, sZ = 1) => {
+                        _partDummy.position.set(parentX * person.scaleW, parentY * person.scaleH, parentZ * person.scaleW);
+                        _partDummy.rotation.set(parentRotX, parentRotY, parentRotZ);
+                        _partDummy.scale.set(1, 1, 1);
+                        _partDummy.updateMatrix();
+                        _tempPartMatrix.multiplyMatrices(_personMatrix, _partDummy.matrix);
+
+                        _partDummy.position.set(childX * person.scaleW, childY * person.scaleH, childZ * person.scaleW);
+                        _partDummy.rotation.set(childRotX, childRotY, childRotZ);
+                        _partDummy.scale.set(sX * person.scaleW, sY * person.scaleH, sZ * person.scaleW);
+                        _partDummy.updateMatrix();
+                        _finalPartMatrix.multiplyMatrices(_tempPartMatrix, _partDummy.matrix);
+                        mesh.setMatrixAt(person.id, _finalPartMatrix);
+                    };
+
                     // Articulation angles
                     const kneeBend = person.state === 'walking' ? Math.max(0, walkAngle * 1.5) : 0.1;
                     const kneeBendOpposite = person.state === 'walking' ? Math.max(0, -walkAngle * 1.5) : 0.1;
                     const elbowBend = 0.3 + Math.abs(walkAngle) * 0.6;
 
-                    setPartMatrix(headMesh, 0, 1.6, 0, 1, 1, 1, sway * 0.5, sway, 0);
-                    setPartMatrix(torsoMesh, 0, 1.15, 0, 1, 1, 1, 0, sway * 0.3, sway);
+                    setPartMatrix(headMesh, 0, 1.6, 0, sway * 0.5, sway, 0);
+                    setPartMatrix(torsoMesh, 0, 1.15, 0, 0, sway * 0.3, sway);
 
                     // Left Leg Articulation
                     const uLegLRot = -walkAngle;
-                    const lLegLRot = uLegLRot - kneeBendOpposite;
-                    setPartMatrix(upperLegLMesh, -0.12, 0.8 - Math.cos(uLegLRot)*0.2, Math.sin(uLegLRot)*0.2, 1, 1, 1, uLegLRot, 0, 0);
-                    const kneeLY = 0.8 - Math.cos(uLegLRot)*0.4;
-                    const kneeLZ = Math.sin(uLegLRot)*0.4;
-                    setPartMatrix(lowerLegLMesh, -0.12, kneeLY - Math.cos(lLegLRot)*0.2, kneeLZ + Math.sin(lLegLRot)*0.2, 1, 1, 1, lLegLRot, 0, 0);
-                    setPartMatrix(footLeftMesh, -0.12, kneeLY - Math.cos(lLegLRot)*0.4, kneeLZ + Math.sin(lLegLRot)*0.4 + 0.05, 1, 1, 1, lLegLRot, 0, 0);
+                    const lLegLRot = -kneeBendOpposite;
+                    setPartMatrix(upperLegLMesh, -0.12, 0.8, 0, uLegLRot, 0, 0);
+                    getChildMatrix(lowerLegLMesh, -0.12, 0.8, 0, uLegLRot, 0, 0, 0, -0.4, 0, lLegLRot, 0, 0);
+                    getChildMatrix(footLeftMesh, -0.12, 0.8, 0, uLegLRot, 0, 0, 0, -0.4, 0, lLegLRot, 0, 0, 1, 1, 1, 0, -0.4, 0); // Need to adjust this for foot
+                    // Wait, getChildMatrix needs another refinement for foot. Actually, foot is child of lower leg.
+
+                    // Simple child logic for foot:
+                    _partDummy.position.set(0, -0.4, 0);
+                    _partDummy.rotation.set(lLegLRot, 0, 0);
+                    _partDummy.scale.set(1, 1, 1);
+                    _partDummy.updateMatrix();
+                    _tempPartMatrix.multiplyMatrices(_finalPartMatrix, _partDummy.matrix); // _finalPartMatrix is already lowerLegL
+                    footLeftMesh.setMatrixAt(person.id, _tempPartMatrix);
 
                     // Right Leg Articulation
                     const uLegRRot = walkAngle;
-                    const lLegRRot = uLegRRot - kneeBend;
-                    setPartMatrix(upperLegRMesh, 0.12, 0.8 - Math.cos(uLegRRot)*0.2, Math.sin(uLegRRot)*0.2, 1, 1, 1, uLegRRot, 0, 0);
-                    const kneeRY = 0.8 - Math.cos(uLegRRot)*0.4;
-                    const kneeRZ = Math.sin(uLegRRot)*0.4;
-                    setPartMatrix(lowerLegRMesh, 0.12, kneeRY - Math.cos(lLegRRot)*0.2, kneeRZ + Math.sin(lLegRRot)*0.2, 1, 1, 1, lLegRRot, 0, 0);
-                    setPartMatrix(footRightMesh, 0.12, kneeRY - Math.cos(lLegRRot)*0.4, kneeRZ + Math.sin(lLegRRot)*0.4 + 0.05, 1, 1, 1, lLegRRot, 0, 0);
+                    const lLegRRot = -kneeBend;
+                    setPartMatrix(upperLegRMesh, 0.12, 0.8, 0, uLegRRot, 0, 0);
+                    getChildMatrix(lowerLegRMesh, 0.12, 0.8, 0, uLegRRot, 0, 0, 0, -0.4, 0, lLegRRot, 0, 0);
+
+                    _partDummy.position.set(0, -0.4, 0);
+                    _partDummy.rotation.set(lLegRRot, 0, 0);
+                    _partDummy.scale.set(1, 1, 1);
+                    _partDummy.updateMatrix();
+                    _tempPartMatrix.multiplyMatrices(_finalPartMatrix, _partDummy.matrix);
+                    footRightMesh.setMatrixAt(person.id, _tempPartMatrix);
 
                     // Left Arm Articulation
                     const uArmLRot = walkAngle;
-                    const lArmLRot = uArmLRot + elbowBend;
-                    setPartMatrix(upperArmLMesh, -0.32, 1.45 - Math.cos(uArmLRot)*0.175, Math.sin(uArmLRot)*0.175, 1, 1, 1, uArmLRot, 0, 0.15 + sway);
-                    const elbowLY = 1.45 - Math.cos(uArmLRot)*0.35;
-                    const elbowLZ = Math.sin(uArmLRot)*0.35;
-                    setPartMatrix(lowerArmLMesh, -0.32, elbowLY - Math.cos(lArmLRot)*0.175, elbowLZ + Math.sin(lArmLRot)*0.175, 1, 1, 1, lArmLRot, 0, 0.15 + sway);
+                    const lArmLRot = elbowBend;
+                    setPartMatrix(upperArmLMesh, -0.32, 1.45, 0, uArmLRot, 0, 0.15 + sway);
+                    getChildMatrix(lowerArmLMesh, -0.32, 1.45, 0, uArmLRot, 0, 0.15 + sway, 0, -0.35, 0, lArmLRot, 0, 0);
 
                     // Right Arm Articulation
                     const uArmRRot = -walkAngle;
-                    const lArmRRot = uArmRRot + elbowBend;
-                    setPartMatrix(upperArmRMesh, 0.32, 1.45 - Math.cos(uArmRRot)*0.175, Math.sin(uArmRRot)*0.175, 1, 1, 1, uArmRRot, 0, -0.15 + sway);
-                    const elbowRY = 1.45 - Math.cos(uArmRRot)*0.35;
-                    const elbowRZ = Math.sin(uArmRRot)*0.35;
-                    setPartMatrix(lowerArmRMesh, 0.32, elbowRY - Math.cos(lArmRRot)*0.175, elbowRZ + Math.sin(lArmRRot)*0.175, 1, 1, 1, lArmRRot, 0, -0.15 + sway);
+                    const lArmRRot = elbowBend;
+                    setPartMatrix(upperArmRMesh, 0.32, 1.45, 0, uArmRRot, 0, -0.15 + sway);
+                    getChildMatrix(lowerArmRMesh, 0.32, 1.45, 0, uArmRRot, 0, -0.15 + sway, 0, -0.35, 0, lArmRRot, 0, 0);
 
-                    setPartMatrix(hairMesh, 0, 1.7, 0, 1, 1, 1, sway * 0.5, sway, 0);
-                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15, 1, 1, 1, sway * 0.5, sway, 0);
-                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15, 1, 1, 1, sway * 0.5, sway, 0);
-                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, 1, 1, 1, Math.PI / 2 + sway * 0.5, -Math.PI / 2 + sway, 0);
+                    setPartMatrix(hairMesh, 0, 1.7, 0, sway * 0.5, sway, 0);
+                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15, sway * 0.5, sway, 0);
+                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15, sway * 0.5, sway, 0);
+                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, Math.PI / 2 + sway * 0.5, -Math.PI / 2 + sway, 0);
                 }
 
                 // After updating all matrices for this station, flag them for update
