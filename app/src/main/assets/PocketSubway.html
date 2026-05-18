@@ -226,50 +226,50 @@
             </button>
         </div>
 
-        <div id="track-gen-menu" class="hidden w-full max-w-4xl mx-auto">
-            <h1 class="text-6xl font-bold mb-8 text-center">TRACK GENERATOR</h1>
-            <div class="bg-black bg-opacity-50 p-6 rounded-lg space-y-6">
-                <div class="flex flex-col space-y-2">
-                    <label for="gen-outside-freq" class="text-lg font-bold">Outside Frequency (0-100%)</label>
+        <div id="track-gen-menu" class="hidden w-full max-w-2xl mx-auto">
+            <h1 class="text-4xl font-bold mb-6 text-center">TRACK GENERATOR</h1>
+            <div class="bg-black bg-opacity-50 p-6 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-outside-freq" class="text-sm font-bold">Outside Frequency</label>
                     <input type="range" id="gen-outside-freq" min="0" max="100" value="50" class="w-full accent-indigo-500">
-                    <p id="gen-outside-freq-val" class="text-right font-mono">50%</p>
+                    <p id="gen-outside-freq-val" class="text-right font-mono text-xs">50%</p>
                 </div>
-                <div class="flex flex-col space-y-2">
-                    <label for="gen-station-freq" class="text-lg font-bold">Station Frequency (0-100%)</label>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-station-freq" class="text-sm font-bold">Station Frequency</label>
                     <input type="range" id="gen-station-freq" min="0" max="100" value="20" class="w-full accent-indigo-500">
-                    <p id="gen-station-freq-val" class="text-right font-mono">20%</p>
+                    <p id="gen-station-freq-val" class="text-right font-mono text-xs">20%</p>
                 </div>
-                <div class="flex flex-col space-y-2">
-                    <label for="gen-curvature" class="text-lg font-bold">Max Curvature</label>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-curvature" class="text-sm font-bold">Max Curvature</label>
                     <input type="range" id="gen-curvature" min="1" max="10" value="5" class="w-full accent-indigo-500">
-                    <p id="gen-curvature-val" class="text-right font-mono">0.005</p>
+                    <p id="gen-curvature-val" class="text-right font-mono text-xs">0.005</p>
                 </div>
-                <div class="flex flex-col space-y-2">
-                    <label for="gen-mountain-dens" class="text-lg font-bold">Mountain Density (0-100%)</label>
-                    <input type="range" id="gen-mountain-dens" min="0" max="100" value="20" class="w-full accent-indigo-500">
-                    <p id="gen-mountain-dens-val" class="text-right font-mono">20%</p>
-                </div>
-                <div class="flex flex-col space-y-2">
-                    <label for="gen-building-dens" class="text-lg font-bold">Building Density (0-100%)</label>
-                    <input type="range" id="gen-building-dens" min="0" max="100" value="50" class="w-full accent-indigo-500">
-                    <p id="gen-building-dens-val" class="text-right font-mono">50%</p>
-                </div>
-                <div class="flex flex-col space-y-2">
-                    <label for="gen-tree-dens" class="text-lg font-bold">Tree Density (0-100%)</label>
-                    <input type="range" id="gen-tree-dens" min="0" max="100" value="50" class="w-full accent-indigo-500">
-                    <p id="gen-tree-dens-val" class="text-right font-mono">50%</p>
-                </div>
-                <div class="flex flex-col space-y-2">
-                    <label for="gen-track-len" class="text-lg font-bold">Track Length (Segments)</label>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-track-len" class="text-sm font-bold">Track Length</label>
                     <input type="range" id="gen-track-len" min="10" max="200" value="50" class="w-full accent-indigo-500">
-                    <p id="gen-track-len-val" class="text-right font-mono">50</p>
+                    <p id="gen-track-len-val" class="text-right font-mono text-xs">50</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-mountain-dens" class="text-sm font-bold">Mountain Density</label>
+                    <input type="range" id="gen-mountain-dens" min="0" max="100" value="20" class="w-full accent-indigo-500">
+                    <p id="gen-mountain-dens-val" class="text-right font-mono text-xs">20%</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-building-dens" class="text-sm font-bold">Building Density</label>
+                    <input type="range" id="gen-building-dens" min="0" max="100" value="50" class="w-full accent-indigo-500">
+                    <p id="gen-building-dens-val" class="text-right font-mono text-xs">50%</p>
+                </div>
+                <div class="flex flex-col space-y-1">
+                    <label for="gen-tree-dens" class="text-sm font-bold">Tree Density</label>
+                    <input type="range" id="gen-tree-dens" min="0" max="100" value="50" class="w-full accent-indigo-500">
+                    <p id="gen-tree-dens-val" class="text-right font-mono text-xs">50%</p>
                 </div>
             </div>
-            <div class="flex space-x-4 mt-8">
-                <button id="apply-track-gen" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
+            <div class="flex flex-col items-center mt-6 space-y-4">
+                <button id="apply-track-gen" class="w-full max-w-sm bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded-lg text-xl transition-transform transform hover:scale-105">
                     Apply & Restart
                 </button>
-                <button id="close-track-gen" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
+                <button id="close-track-gen" class="w-full max-w-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg text-lg transition-transform transform hover:scale-105">
                     Return
                 </button>
             </div>
@@ -857,7 +857,7 @@
         // Strecken-Generierung
         const stations = [];
         const signals = [];
-        let NUM_SEGMENTS = 5;
+        let NUM_SEGMENTS = 50;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
         const STATION_LENGTH = 200; 
