@@ -1265,9 +1265,11 @@
             stainNormal.wrapS = THREE.RepeatWrapping;
             stainNormal.wrapT = THREE.RepeatWrapping;
 
-            // Less repetition for a stained look
-            stainTexture.repeat.set(1, 4);
-            stainNormal.repeat.set(1, 4);
+            // Initial repeat for world-space UVs (y=4 means 4 repeats around circumference)
+            const tunnelCircumference = 2 * Math.PI * 5.0;
+            const physicalHeightOfOneRepeat = tunnelCircumference / 4;
+            stainTexture.repeat.set(1 / physicalHeightOfOneRepeat, 4);
+            stainNormal.repeat.set(1 / physicalHeightOfOneRepeat, 4);
 
             tunnelMaterial = new THREE.MeshStandardMaterial({ 
                 map: stainTexture,
@@ -1666,12 +1668,12 @@
             // Signale erstellen
             createSignals(trackCurve);
 
-            // Passe die Wiederholung der Ziegeltextur an die tatsächliche Streckenlänge an
+            // Passe die Wiederholung der Ziegeltextur an (Weltraum-UVs verwendet)
             const tunnelCircumference = 2 * Math.PI * 5.0; // tunnelRadius = 5.0
             const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
-            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Assume square bricks for now
-            tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
-            tunnelMaterial.normalMap.repeat.x = totalTrackLength / physicalWidthOfOneRepeat; // Auch NormalMap anpassen!
+            const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
+            tunnelMaterial.map.repeat.x = 1 / physicalWidthOfOneRepeat;
+            tunnelMaterial.normalMap.repeat.x = 1 / physicalWidthOfOneRepeat;
             tunnelMaterial.map.needsUpdate = true;
             tunnelMaterial.normalMap.needsUpdate = true;
         }
@@ -2265,6 +2267,15 @@
 
                 if (seg.type === 'Tunnel') {
                     const tunnelGeometry = new THREE.TubeGeometry(segCurve, segTubularSegments, tunnelRadius, 32, false);
+
+                    // Adjust UVs for consistent world-space tiling along the length
+                    const uvAttr = tunnelGeometry.attributes.uv;
+                    for (let i = 0; i < uvAttr.count; i++) {
+                        const u = uvAttr.getX(i);
+                        const worldDist = seg.start + u * (seg.end - seg.start);
+                        uvAttr.setX(i, worldDist);
+                    }
+
                     const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
                     tunnelMesh.receiveShadow = true;
                     trackGroup.add(tunnelMesh);
@@ -3406,15 +3417,13 @@
             newNormalMap.wrapS = THREE.RepeatWrapping;
             newNormalMap.wrapT = THREE.RepeatWrapping;
 
-            // Recalculate repeat X based on track length logic
+            // Recalculate repeat X based on world-space UVs
             const tunnelCircumference = 2 * Math.PI * 5.0;
             const physicalHeightOfOneRepeat = tunnelCircumference / repeatY;
             const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat; // Square aspect for texture tiles
 
-            const repeatX = totalTrackLength > 0 ? totalTrackLength / physicalWidthOfOneRepeat : 1;
-
-            newMap.repeat.set(repeatX, repeatY);
-            newNormalMap.repeat.set(repeatX, repeatY);
+            newMap.repeat.set(1 / physicalWidthOfOneRepeat, repeatY);
+            newNormalMap.repeat.set(1 / physicalWidthOfOneRepeat, repeatY);
 
             // Update Material
             tunnelMaterial.map = newMap;
@@ -3794,7 +3803,7 @@
                         const tunnelCircumference = 2 * Math.PI * 5.0;
                         const physicalHeightOfOneRepeat = tunnelCircumference / tunnelMaterial.map.repeat.y;
                         const physicalWidthOfOneRepeat = physicalHeightOfOneRepeat;
-                        tunnelMaterial.map.repeat.x = totalTrackLength / physicalWidthOfOneRepeat;
+                        tunnelMaterial.map.repeat.x = 1 / physicalWidthOfOneRepeat;
                         tunnelMaterial.map.needsUpdate = true;
 
                         // 7. Pünktlichkeits-Zustand wiederherstellen
