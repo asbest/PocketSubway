@@ -230,9 +230,14 @@
             <h1 class="text-6xl font-bold mb-8 text-center">TRACK GENERATOR</h1>
             <div class="bg-black bg-opacity-50 p-6 rounded-lg space-y-6">
                 <div class="flex flex-col space-y-2">
-                    <label for="gen-outside-freq" class="text-lg font-bold">Station Frequency (0-100%)</label>
-                    <input type="range" id="gen-outside-freq" min="0" max="100" value="20" class="w-full accent-indigo-500">
-                    <p id="gen-outside-freq-val" class="text-right font-mono">20%</p>
+                    <label for="gen-outside-freq" class="text-lg font-bold">Outside Frequency (0-100%)</label>
+                    <input type="range" id="gen-outside-freq" min="0" max="100" value="50" class="w-full accent-indigo-500">
+                    <p id="gen-outside-freq-val" class="text-right font-mono">50%</p>
+                </div>
+                <div class="flex flex-col space-y-2">
+                    <label for="gen-station-freq" class="text-lg font-bold">Station Frequency (0-100%)</label>
+                    <input type="range" id="gen-station-freq" min="0" max="100" value="20" class="w-full accent-indigo-500">
+                    <p id="gen-station-freq-val" class="text-right font-mono">20%</p>
                 </div>
                 <div class="flex flex-col space-y-2">
                     <label for="gen-curvature" class="text-lg font-bold">Max Curvature</label>
@@ -265,7 +270,7 @@
                     Apply & Restart
                 </button>
                 <button id="close-track-gen" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 px-8 rounded-lg text-2xl transition-transform transform hover:scale-105">
-                    Back
+                    Return
                 </button>
             </div>
         </div>
@@ -793,7 +798,8 @@
         window.trackConfig = {
             numSegments: 50,
             maxCurvature: 0.001,
-            outsideFrequency: 0.2,
+            outsideFrequency: 0.5,
+            stationFrequency: 0.2,
             mountainDensity: 0.02,
             buildingDensity: 0.05,
             treeDensity: 0.05
@@ -851,7 +857,7 @@
         // Strecken-Generierung
         const stations = [];
         const signals = [];
-        let NUM_SEGMENTS = 50;
+        let NUM_SEGMENTS = 5;
         const MIN_SEGMENT_LENGTH = 300; 
         const MAX_SEGMENT_LENGTH = 1000; 
         const STATION_LENGTH = 200; 
@@ -919,6 +925,8 @@
             closeTrackGenButton: document.getElementById('close-track-gen'),
             genOutsideFreq: document.getElementById('gen-outside-freq'),
             genOutsideFreqVal: document.getElementById('gen-outside-freq-val'),
+            genStationFreq: document.getElementById('gen-station-freq'),
+            genStationFreqVal: document.getElementById('gen-station-freq-val'),
             genCurvature: document.getElementById('gen-curvature'),
             genCurvatureVal: document.getElementById('gen-curvature-val'),
             genMountainDens: document.getElementById('gen-mountain-dens'),
@@ -1511,12 +1519,19 @@
 
             let currentEnvType = 'Tunnel';
             let stationsInCurrentEnv = 1; // Start station counts as 1
-            let targetStationsInEnv = Math.floor(Math.random() * 6) + 5; // 5 to 10 stations for first tunnel
+
+            const outsideFreq = window.trackConfig ? window.trackConfig.outsideFrequency : 0.5;
+            const stationFreq = window.trackConfig ? window.trackConfig.stationFrequency : 0.2;
+
+            let targetStationsInEnv = currentEnvType === 'Tunnel' ?
+                Math.max(1, Math.round(10 * (1 - outsideFreq))) :
+                Math.max(1, Math.round(10 * outsideFreq));
+
             let lastEnvChangeDist = 0;
 
             // --- 3. Restliche Strecke prozedural generieren ---
             for (let i = 1; i < NUM_SEGMENTS; i++) { 
-                const isStation = Math.random() < (window.trackConfig ? window.trackConfig.outsideFrequency : 0.2) && !lastWasStation;
+                const isStation = Math.random() < stationFreq && !lastWasStation;
                 
                 if (isStation) {
                     segmentLength = STATION_LENGTH;
@@ -1607,10 +1622,10 @@
 
                         if (currentEnvType === 'Tunnel') {
                             currentEnvType = 'Countryside';
-                            targetStationsInEnv = 2; // Countryside always 2 stations
+                            targetStationsInEnv = Math.max(1, Math.round(10 * outsideFreq));
                         } else {
                             currentEnvType = 'Tunnel';
-                            targetStationsInEnv = Math.floor(Math.random() * 6) + 5; // Tunnel 5-10 stations
+                            targetStationsInEnv = Math.max(1, Math.round(10 * (1 - outsideFreq)));
                         }
 
                         stationsInCurrentEnv = 0;
@@ -3183,6 +3198,8 @@
                 // Set initial values from trackConfig
                 ui.genOutsideFreq.value = window.trackConfig.outsideFrequency * 100;
                 ui.genOutsideFreqVal.innerText = (window.trackConfig.outsideFrequency * 100).toFixed(0) + '%';
+                ui.genStationFreq.value = window.trackConfig.stationFrequency * 100;
+                ui.genStationFreqVal.innerText = (window.trackConfig.stationFrequency * 100).toFixed(0) + '%';
                 ui.genCurvature.value = window.trackConfig.maxCurvature * 1000;
                 ui.genCurvatureVal.innerText = (window.trackConfig.maxCurvature).toFixed(3);
                 ui.genMountainDens.value = window.trackConfig.mountainDensity * 1000; // Scaled for slider
@@ -3203,6 +3220,9 @@
             ui.genOutsideFreq.addEventListener('input', (e) => {
                 ui.genOutsideFreqVal.innerText = e.target.value + '%';
             });
+            ui.genStationFreq.addEventListener('input', (e) => {
+                ui.genStationFreqVal.innerText = e.target.value + '%';
+            });
             ui.genCurvature.addEventListener('input', (e) => {
                 ui.genCurvatureVal.innerText = (e.target.value / 1000).toFixed(3);
             });
@@ -3221,6 +3241,7 @@
 
             ui.applyTrackGenButton.addEventListener('click', () => {
                 window.trackConfig.outsideFrequency = ui.genOutsideFreq.value / 100;
+                window.trackConfig.stationFrequency = ui.genStationFreq.value / 100;
                 window.trackConfig.maxCurvature = ui.genCurvature.value / 1000;
                 window.trackConfig.mountainDensity = ui.genMountainDens.value / 1000;
                 window.trackConfig.buildingDensity = ui.genBuildingDens.value / 1000;
