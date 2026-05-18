@@ -982,9 +982,9 @@
 
             // Auflösung, Stärke, Radius, Threshold
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = 0.2; // Ab welcher Helligkeit Bloom wirkt
-            bloomPass.strength = 0.8;  // Wie stark das Leuchten ist
-            bloomPass.radius = 0.5;    // Wie weit das Leuchten streut
+            bloomPass.threshold = 0.85; // Increased threshold to prevent general scenery from blooming
+            bloomPass.strength = 1.2;   // Slightly stronger but more selective bloom
+            bloomPass.radius = 0.4;    // Tighter glow
 
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
@@ -1025,7 +1025,7 @@
             const beamMat = new THREE.MeshBasicMaterial({
                 color: 0xffffee,
                 transparent: true,
-                opacity: 0.1,
+                opacity: 0.05,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 side: THREE.DoubleSide
@@ -3903,19 +3903,19 @@
         }
 
         // --- Environment Update ---
-        function updateEnvironment() {
+        const updateEnvironment = window.updateEnvironment = function() {
             const currentType = getEnvTypeAt(playerDistance);
 
             // Define target values
-            const targetFogColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd); // Muted Blue-Grey
-            const targetFogNear = currentType === 'Tunnel' ? 50 : 200;
-            const targetFogFar = currentType === 'Tunnel' ? 800 : 3000;
-            const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
+            const targetFogColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x182028); // Deeper contrast for countryside
+            const targetFogNear = currentType === 'Tunnel' ? 50 : 500;
+            const targetFogFar = currentType === 'Tunnel' ? 800 : 3500;
+            const targetBgColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x182028);
 
             // Light Intensity & Color Targets
-            const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.1;
-            const targetSkyColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x7da4bd);
-            const targetGroundColor = currentType === 'Tunnel' ? new THREE.Color(0x101010) : new THREE.Color(0x554433);
+            const targetHemiIntensity = currentType === 'Tunnel' ? 0.4 : 0.08;
+            const targetSkyColor = currentType === 'Tunnel' ? new THREE.Color(0x202020) : new THREE.Color(0x202830);
+            const targetGroundColor = currentType === 'Tunnel' ? new THREE.Color(0x101010) : new THREE.Color(0x050505);
 
             // Lerp values
             const lerpFactor = 0.02;
