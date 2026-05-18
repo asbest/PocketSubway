@@ -2774,6 +2774,10 @@
                         STATION_PLATFORM_HEIGHT,
                         randomZRelative
                     );
+
+                    const scaleH = 0.85 + Math.random() * 0.3; // Height scale: 0.85 to 1.15
+                    const scaleW = 0.8 + Math.random() * 0.4;  // Width/Girth scale: 0.8 to 1.2
+
                     dummy.position.copy(personPosition);
                     dummy.rotation.y = Math.random() * Math.PI * 2;
                     dummy.updateMatrix();
@@ -2788,31 +2792,36 @@
                             Math.random() * (maxZRelative - minZRelative) + minZRelative
                         ),
                         speed: 0.5 + Math.random() * 0.5, // m/s
-                        rotation: new THREE.Quaternion().setFromEuler(dummy.rotation)
+                        rotation: new THREE.Quaternion().setFromEuler(dummy.rotation),
+                        scaleH: scaleH,
+                        scaleW: scaleW,
+                        state: 'walking',
+                        stateTimer: 0
                     });
 
 
                     // Anwenden der Transformation auf jeden Körperteil mit seiner relativen Position
-                    const setPartMatrix = (mesh, x, y, z, rotX = 0, rotY = 0, rotZ = 0) => {
+                    const setPartMatrix = (mesh, x, y, z, sX = 1, sY = 1, sZ = 1, rotX = 0, rotY = 0, rotZ = 0) => {
                         const partDummy = new THREE.Object3D();
-                        partDummy.position.set(x, y, z);
+                        partDummy.position.set(x * scaleW, y * scaleH, z * scaleW);
+                        partDummy.scale.set(sX * scaleW, sY * scaleH, sZ * scaleW);
                         partDummy.rotation.set(rotX, rotY, rotZ);
                         partDummy.updateMatrix();
                         mesh.setMatrixAt(i, tempMatrix.multiplyMatrices(dummy.matrix, partDummy.matrix));
                     };
 
-                    setPartMatrix(headMesh, 0, 1.6, 0);
-                    setPartMatrix(torsoMesh, 0, 1.15, 0);
-                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, 0, 0, 0.15);
-                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, 0, 0, -0.15);
-                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0);
-                    setPartMatrix(legRightMesh, 0.12, 0.45, 0);
-                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05);
-                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05);
-                    setPartMatrix(hairMesh, 0, 1.7, 0);
-                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15);
-                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15);
-                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, Math.PI / 2, -Math.PI / 2, 0);
+                    setPartMatrix(headMesh, 0, 1.6, 0, 1, 1, 1);
+                    setPartMatrix(torsoMesh, 0, 1.15, 0, 1, 1, 1);
+                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, 1, 1, 1, 0, 0, 0.15);
+                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, 1, 1, 1, 0, 0, -0.15);
+                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0, 1, 1, 1);
+                    setPartMatrix(legRightMesh, 0.12, 0.45, 0, 1, 1, 1);
+                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05, 1, 1, 1);
+                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05, 1, 1, 1);
+                    setPartMatrix(hairMesh, 0, 1.7, 0, 1, 1, 1);
+                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15, 1, 1, 1);
+                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15, 1, 1, 1);
+                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, 1, 1, 1, Math.PI / 2, -Math.PI / 2, 0);
                 }
 
                 // Wichtig: Updates für Matrizen und Farben anstoßen
@@ -2862,55 +2871,84 @@
                 const maxXRelative = -STATION_PLATFORM_WIDTH / 2 + maxXRelativeFromEdge;
 
                 for (const person of station.people) {
-                    // 1. Check if target is reached and set a new one
-                    if (person.position.distanceTo(person.target) < 0.5) {
-                        const onLeftSide = person.position.x > 0;
-                        person.target.set(
-                           onLeftSide ? STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative) : -(STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative)),
-                           person.position.y,
-                           Math.random() * (maxZRelative - minZRelative) + minZRelative
-                        );
+                    let walkAngle = 0;
+                    let bobbing = 0;
+                    let sway = 0;
+
+                    if (person.state === 'walking') {
+                        // 1. Check if target is reached
+                        if (person.position.distanceTo(person.target) < 0.5) {
+                            person.state = 'idle';
+                            person.stateTimer = 1.0 + Math.random() * 4.0; // Idle for 1-5 seconds
+                        } else {
+                            // 2. Smoothly rotate towards the target
+                            _personLookAtMatrix.lookAt(person.target, person.position, _upVector);
+                            _personRotationQuaternion.setFromRotationMatrix(_personLookAtMatrix);
+                            person.rotation.slerp(_personRotationQuaternion, dt * 3.0);
+
+                            // 3. Move towards the target
+                            _personTargetDirection.subVectors(person.target, person.position).normalize();
+                            person.position.addScaledVector(_personTargetDirection, person.speed * dt);
+
+                            // --- Procedural Walk Cycle ---
+                            const walkFreq = person.speed * 6;
+                            const walkCycle = Math.sin(clock.elapsedTime * walkFreq);
+                            walkAngle = walkCycle * 0.4; // 0.4 radians amplitude
+                            bobbing = Math.abs(Math.cos(clock.elapsedTime * walkFreq)) * 0.08;
+                            sway = Math.sin(clock.elapsedTime * walkFreq * 0.5) * 0.05;
+                        }
+                    } else if (person.state === 'idle') {
+                        person.stateTimer -= dt;
+                        if (person.stateTimer <= 0) {
+                            person.state = 'walking';
+                            const onLeftSide = person.position.x > 0;
+                            person.target.set(
+                                onLeftSide ? STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative) : -(STATION_PLATFORM_OFFSET + (Math.random() * (maxXRelative - minXRelative) + minXRelative)),
+                                person.position.y,
+                                Math.random() * (maxZRelative - minZRelative) + minZRelative
+                            );
+                        }
+                        // Idle behavior: subtly look around
+                        if (Math.random() < 0.01) {
+                            person.idleLookAngle = (Math.random() - 0.5) * Math.PI * 0.5;
+                        }
+                        if (person.idleLookAngle) {
+                             const lookQuat = new THREE.Quaternion().setFromAxisAngle(_upVector, person.idleLookAngle);
+                             // We need to apply this to their base rotation, but for simplicity just slerp a bit
+                             // Actually better to just sway slightly
+                        }
+                        sway = Math.sin(clock.elapsedTime * 0.5) * 0.02;
                     }
-
-                    // 2. Smoothly rotate towards the target
-                    _personLookAtMatrix.lookAt(person.target, person.position, _upVector);
-                    _personRotationQuaternion.setFromRotationMatrix(_personLookAtMatrix);
-                    person.rotation.slerp(_personRotationQuaternion, dt * 2.0);
-
-                    // 3. Move towards the target
-                    _personTargetDirection.subVectors(person.target, person.position).normalize();
-                    person.position.addScaledVector(_personTargetDirection, person.speed * dt);
 
                     // 4. Update the main transformation matrix for this person's instance
                     _personMatrix.compose(person.position, person.rotation, _scaleVector);
+                    // Add bobbing to the position in the matrix
+                    _personMatrix.elements[13] += bobbing * person.scaleH;
 
                     // 5. Apply this transformation to all body part instances
                     const { headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh } = station.bodyMeshes;
 
-                    // --- Procedural Walk Cycle ---
-                    const walkCycle = Math.sin(clock.elapsedTime * person.speed * 5);
-                    const walkAngle = walkCycle * 0.4; // 0.4 radians amplitude
-
-                    const setPartMatrix = (mesh, x, y, z, rotX = 0, rotY = 0, rotZ = 0) => {
-                        _partDummy.position.set(x, y, z);
+                    const setPartMatrix = (mesh, x, y, z, sX = 1, sY = 1, sZ = 1, rotX = 0, rotY = 0, rotZ = 0) => {
+                        _partDummy.position.set(x * person.scaleW, y * person.scaleH, z * person.scaleW);
+                        _partDummy.scale.set(sX * person.scaleW, sY * person.scaleH, sZ * person.scaleW);
                         _partDummy.rotation.set(rotX, rotY, rotZ);
                         _partDummy.updateMatrix();
                         _finalPartMatrix.multiplyMatrices(_personMatrix, _partDummy.matrix);
                         mesh.setMatrixAt(person.id, _finalPartMatrix);
                     };
 
-                    setPartMatrix(headMesh, 0, 1.6, 0);
-                    setPartMatrix(torsoMesh, 0, 1.15, 0);
-                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, walkAngle, 0, 0.15);
-                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, -walkAngle, 0, -0.15);
-                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0, -walkAngle, 0, 0);
-                    setPartMatrix(legRightMesh, 0.12, 0.45, 0, walkAngle, 0, 0);
-                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05, -walkAngle, 0, 0);
-                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05, walkAngle, 0, 0);
-                    setPartMatrix(hairMesh, 0, 1.7, 0);
-                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15);
-                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15);
-                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, Math.PI / 2, -Math.PI / 2, 0);
+                    setPartMatrix(headMesh, 0, 1.6, 0, 1, 1, 1, sway * 0.5, sway, 0);
+                    setPartMatrix(torsoMesh, 0, 1.15, 0, 1, 1, 1, 0, sway * 0.3, sway);
+                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, 1, 1, 1, walkAngle, 0, 0.15 + sway);
+                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, 1, 1, 1, -walkAngle, 0, -0.15 + sway);
+                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0, 1, 1, 1, -walkAngle, 0, 0);
+                    setPartMatrix(legRightMesh, 0.12, 0.45, 0, 1, 1, 1, walkAngle, 0, 0);
+                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05, 1, 1, 1, -walkAngle, 0, 0);
+                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05, 1, 1, 1, walkAngle, 0, 0);
+                    setPartMatrix(hairMesh, 0, 1.7, 0, 1, 1, 1, sway * 0.5, sway, 0);
+                    setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15, 1, 1, 1, sway * 0.5, sway, 0);
+                    setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15, 1, 1, 1, sway * 0.5, sway, 0);
+                    setPartMatrix(mouthMesh, 0, 1.52, 0.17, 1, 1, 1, Math.PI / 2 + sway * 0.5, -Math.PI / 2 + sway, 0);
                 }
 
                 // After updating all matrices for this station, flag them for update
@@ -4494,7 +4532,6 @@
         // --- Start ---
         init();
 
-        window.testShowFact = showRandomFact; // Temporärer Testhaken
 
     </script>
 </body>
