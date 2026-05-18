@@ -2694,8 +2694,10 @@
                 // Geometrien einmal erstellen
                 const headGeo = new THREE.SphereGeometry(0.18, 16, 12);
                 const torsoGeo = new THREE.CylinderGeometry(0.2, 0.3, 0.6, 12);
-                const legGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.75, 8);
-                const armGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.65, 8);
+                const upperLegGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.4, 8);
+                const lowerLegGeo = new THREE.CylinderGeometry(0.1, 0.07, 0.4, 8);
+                const upperArmGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.35, 8);
+                const lowerArmGeo = new THREE.CylinderGeometry(0.07, 0.06, 0.35, 8);
                 const footGeo = new THREE.BoxGeometry(0.18, 0.08, 0.3);
                 const hairGeo = new THREE.SphereGeometry(0.15, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2); // Halbkugel für Haare
                 const eyeGeo = new THREE.SphereGeometry(0.03, 8, 8);
@@ -2716,10 +2718,14 @@
 
                 const headMesh = new THREE.InstancedMesh(headGeo, bodyPartMaterial.clone(), totalPeople);
                 const torsoMesh = new THREE.InstancedMesh(torsoGeo, bodyPartMaterial.clone(), totalPeople);
-                const armLeftMesh = new THREE.InstancedMesh(armGeo, bodyPartMaterial.clone(), totalPeople);
-                const armRightMesh = new THREE.InstancedMesh(armGeo, bodyPartMaterial.clone(), totalPeople);
-                const legLeftMesh = new THREE.InstancedMesh(legGeo, bodyPartMaterial.clone(), totalPeople);
-                const legRightMesh = new THREE.InstancedMesh(legGeo, bodyPartMaterial.clone(), totalPeople);
+                const upperArmLMesh = new THREE.InstancedMesh(upperArmGeo, bodyPartMaterial.clone(), totalPeople);
+                const lowerArmLMesh = new THREE.InstancedMesh(lowerArmGeo, bodyPartMaterial.clone(), totalPeople);
+                const upperArmRMesh = new THREE.InstancedMesh(upperArmGeo, bodyPartMaterial.clone(), totalPeople);
+                const lowerArmRMesh = new THREE.InstancedMesh(lowerArmGeo, bodyPartMaterial.clone(), totalPeople);
+                const upperLegLMesh = new THREE.InstancedMesh(upperLegGeo, bodyPartMaterial.clone(), totalPeople);
+                const lowerLegLMesh = new THREE.InstancedMesh(lowerLegGeo, bodyPartMaterial.clone(), totalPeople);
+                const upperLegRMesh = new THREE.InstancedMesh(upperLegGeo, bodyPartMaterial.clone(), totalPeople);
+                const lowerLegRMesh = new THREE.InstancedMesh(lowerLegGeo, bodyPartMaterial.clone(), totalPeople);
                 const footLeftMesh = new THREE.InstancedMesh(footGeo, shoesMaterial, totalPeople);
                 const footRightMesh = new THREE.InstancedMesh(footGeo, shoesMaterial, totalPeople);
                 const hairMesh = new THREE.InstancedMesh(hairGeo, bodyPartMaterial.clone(), totalPeople);
@@ -2728,12 +2734,12 @@
                 const mouthMesh = new THREE.InstancedMesh(mouthGeo, mouthMaterial, totalPeople);
 
                 // Schatten für Personen
-                [headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh].forEach(mesh => {
+                [headMesh, torsoMesh, upperArmLMesh, lowerArmLMesh, upperArmRMesh, lowerArmRMesh, upperLegLMesh, lowerLegLMesh, upperLegRMesh, lowerLegRMesh, footLeftMesh, footRightMesh, hairMesh].forEach(mesh => {
                     mesh.castShadow = true;
                     mesh.receiveShadow = true;
                 });
 
-                stationGroup.add(headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh);
+                stationGroup.add(headMesh, torsoMesh, upperArmLMesh, lowerArmLMesh, upperArmRMesh, lowerArmRMesh, upperLegLMesh, lowerLegLMesh, upperLegRMesh, lowerLegRMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh);
 
                 const dummy = new THREE.Object3D();
                 const tempMatrix = new THREE.Matrix4();
@@ -2746,7 +2752,7 @@
                 const maxZRelative = station.length / 2 - 2;
 
                 // References to all meshes for easier access in the animation loop
-                station.bodyMeshes = { headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh };
+                station.bodyMeshes = { headMesh, torsoMesh, upperArmLMesh, lowerArmLMesh, upperArmRMesh, lowerArmRMesh, upperLegLMesh, lowerLegLMesh, upperLegRMesh, lowerLegRMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh };
 
 
                 for (let i = 0; i < totalPeople; i++) {
@@ -2757,11 +2763,15 @@
                     const hairColor = hairColors[Math.floor(Math.random() * hairColors.length)];
 
                     headMesh.setColorAt(i, skinColor);
-                    armLeftMesh.setColorAt(i, skinColor);
-                    armRightMesh.setColorAt(i, skinColor);
+                    upperArmLMesh.setColorAt(i, skinColor);
+                    lowerArmLMesh.setColorAt(i, skinColor);
+                    upperArmRMesh.setColorAt(i, skinColor);
+                    lowerArmRMesh.setColorAt(i, skinColor);
                     torsoMesh.setColorAt(i, shirtColor);
-                    legLeftMesh.setColorAt(i, pantsColor);
-                    legRightMesh.setColorAt(i, pantsColor);
+                    upperLegLMesh.setColorAt(i, pantsColor);
+                    lowerLegLMesh.setColorAt(i, pantsColor);
+                    upperLegRMesh.setColorAt(i, pantsColor);
+                    lowerLegRMesh.setColorAt(i, pantsColor);
                     hairMesh.setColorAt(i, hairColor);
 
                     // Position und Rotation der gesamten Person
@@ -2812,10 +2822,14 @@
 
                     setPartMatrix(headMesh, 0, 1.6, 0, 1, 1, 1);
                     setPartMatrix(torsoMesh, 0, 1.15, 0, 1, 1, 1);
-                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, 1, 1, 1, 0, 0, 0.15);
-                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, 1, 1, 1, 0, 0, -0.15);
-                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0, 1, 1, 1);
-                    setPartMatrix(legRightMesh, 0.12, 0.45, 0, 1, 1, 1);
+                    setPartMatrix(upperArmLMesh, -0.32, 1.275, 0, 1, 1, 1, 0.2, 0, 0.15);
+                    setPartMatrix(lowerArmLMesh, -0.32, 0.925, 0.1, 1, 1, 1, 0.4, 0, 0.15);
+                    setPartMatrix(upperArmRMesh, 0.32, 1.275, 0, 1, 1, 1, 0.2, 0, -0.15);
+                    setPartMatrix(lowerArmRMesh, 0.32, 0.925, 0.1, 1, 1, 1, 0.4, 0, -0.15);
+                    setPartMatrix(upperLegLMesh, -0.12, 0.6, 0, 1, 1, 1);
+                    setPartMatrix(lowerLegLMesh, -0.12, 0.2, 0, 1, 1, 1);
+                    setPartMatrix(upperLegRMesh, 0.12, 0.6, 0, 1, 1, 1);
+                    setPartMatrix(lowerLegRMesh, 0.12, 0.2, 0, 1, 1, 1);
                     setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05, 1, 1, 1);
                     setPartMatrix(footRightMesh, 0.12, 0.04, 0.05, 1, 1, 1);
                     setPartMatrix(hairMesh, 0, 1.7, 0, 1, 1, 1);
@@ -2825,25 +2839,10 @@
                 }
 
                 // Wichtig: Updates für Matrizen und Farben anstoßen
-                headMesh.instanceMatrix.needsUpdate = true;
-                headMesh.instanceColor.needsUpdate = true;
-                torsoMesh.instanceMatrix.needsUpdate = true;
-                torsoMesh.instanceColor.needsUpdate = true;
-                armLeftMesh.instanceMatrix.needsUpdate = true;
-                armLeftMesh.instanceColor.needsUpdate = true;
-                armRightMesh.instanceMatrix.needsUpdate = true;
-                armRightMesh.instanceColor.needsUpdate = true;
-                legLeftMesh.instanceMatrix.needsUpdate = true;
-                legLeftMesh.instanceColor.needsUpdate = true;
-                legRightMesh.instanceMatrix.needsUpdate = true;
-                legRightMesh.instanceColor.needsUpdate = true;
-                footLeftMesh.instanceMatrix.needsUpdate = true;
-                footRightMesh.instanceMatrix.needsUpdate = true;
-                hairMesh.instanceMatrix.needsUpdate = true;
-                hairMesh.instanceColor.needsUpdate = true;
-                eyeLeftMesh.instanceMatrix.needsUpdate = true;
-                eyeRightMesh.instanceMatrix.needsUpdate = true;
-                mouthMesh.instanceMatrix.needsUpdate = true;
+                for (const mesh of Object.values(station.bodyMeshes)) {
+                    mesh.instanceMatrix.needsUpdate = true;
+                    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+                }
             });
         }
 
@@ -2854,6 +2853,7 @@
         const _personMatrix = new THREE.Matrix4();
         const _partDummy = new THREE.Object3D();
         const _finalPartMatrix = new THREE.Matrix4();
+        const _tempPartMatrix = new THREE.Matrix4();
         const _upVector = new THREE.Vector3(0, 1, 0);
         const _scaleVector = new THREE.Vector3(1, 1, 1);
 
@@ -2907,15 +2907,15 @@
                                 person.position.y,
                                 Math.random() * (maxZRelative - minZRelative) + minZRelative
                             );
+                            person.idleLookAngle = 0;
                         }
                         // Idle behavior: subtly look around
                         if (Math.random() < 0.01) {
-                            person.idleLookAngle = (Math.random() - 0.5) * Math.PI * 0.5;
+                            person.idleLookAngle = (Math.random() - 0.5) * Math.PI * 0.8;
                         }
                         if (person.idleLookAngle) {
-                             const lookQuat = new THREE.Quaternion().setFromAxisAngle(_upVector, person.idleLookAngle);
-                             // We need to apply this to their base rotation, but for simplicity just slerp a bit
-                             // Actually better to just sway slightly
+                             _personRotationQuaternion.setFromAxisAngle(_upVector, person.idleLookAngle);
+                             person.rotation.slerp(_personRotationQuaternion, dt * 2.0);
                         }
                         sway = Math.sin(clock.elapsedTime * 0.5) * 0.02;
                     }
@@ -2926,7 +2926,7 @@
                     _personMatrix.elements[13] += bobbing * person.scaleH;
 
                     // 5. Apply this transformation to all body part instances
-                    const { headMesh, torsoMesh, armLeftMesh, armRightMesh, legLeftMesh, legRightMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh } = station.bodyMeshes;
+                    const { headMesh, torsoMesh, upperArmLMesh, lowerArmLMesh, upperArmRMesh, lowerArmRMesh, upperLegLMesh, lowerLegLMesh, upperLegRMesh, lowerLegRMesh, footLeftMesh, footRightMesh, hairMesh, eyeLeftMesh, eyeRightMesh, mouthMesh } = station.bodyMeshes;
 
                     const setPartMatrix = (mesh, x, y, z, sX = 1, sY = 1, sZ = 1, rotX = 0, rotY = 0, rotZ = 0) => {
                         _partDummy.position.set(x * person.scaleW, y * person.scaleH, z * person.scaleW);
@@ -2937,14 +2937,48 @@
                         mesh.setMatrixAt(person.id, _finalPartMatrix);
                     };
 
+                    // Articulation angles
+                    const kneeBend = person.state === 'walking' ? Math.max(0, walkAngle * 1.5) : 0.1;
+                    const kneeBendOpposite = person.state === 'walking' ? Math.max(0, -walkAngle * 1.5) : 0.1;
+                    const elbowBend = 0.3 + Math.abs(walkAngle) * 0.6;
+
                     setPartMatrix(headMesh, 0, 1.6, 0, 1, 1, 1, sway * 0.5, sway, 0);
                     setPartMatrix(torsoMesh, 0, 1.15, 0, 1, 1, 1, 0, sway * 0.3, sway);
-                    setPartMatrix(armLeftMesh, -0.32, 1.1, 0, 1, 1, 1, walkAngle, 0, 0.15 + sway);
-                    setPartMatrix(armRightMesh, 0.32, 1.1, 0, 1, 1, 1, -walkAngle, 0, -0.15 + sway);
-                    setPartMatrix(legLeftMesh, -0.12, 0.45, 0, 1, 1, 1, -walkAngle, 0, 0);
-                    setPartMatrix(legRightMesh, 0.12, 0.45, 0, 1, 1, 1, walkAngle, 0, 0);
-                    setPartMatrix(footLeftMesh, -0.12, 0.04, 0.05, 1, 1, 1, -walkAngle, 0, 0);
-                    setPartMatrix(footRightMesh, 0.12, 0.04, 0.05, 1, 1, 1, walkAngle, 0, 0);
+
+                    // Left Leg Articulation
+                    const uLegLRot = -walkAngle;
+                    const lLegLRot = uLegLRot - kneeBendOpposite;
+                    setPartMatrix(upperLegLMesh, -0.12, 0.8 - Math.cos(uLegLRot)*0.2, Math.sin(uLegLRot)*0.2, 1, 1, 1, uLegLRot, 0, 0);
+                    const kneeLY = 0.8 - Math.cos(uLegLRot)*0.4;
+                    const kneeLZ = Math.sin(uLegLRot)*0.4;
+                    setPartMatrix(lowerLegLMesh, -0.12, kneeLY - Math.cos(lLegLRot)*0.2, kneeLZ + Math.sin(lLegLRot)*0.2, 1, 1, 1, lLegLRot, 0, 0);
+                    setPartMatrix(footLeftMesh, -0.12, kneeLY - Math.cos(lLegLRot)*0.4, kneeLZ + Math.sin(lLegLRot)*0.4 + 0.05, 1, 1, 1, lLegLRot, 0, 0);
+
+                    // Right Leg Articulation
+                    const uLegRRot = walkAngle;
+                    const lLegRRot = uLegRRot - kneeBend;
+                    setPartMatrix(upperLegRMesh, 0.12, 0.8 - Math.cos(uLegRRot)*0.2, Math.sin(uLegRRot)*0.2, 1, 1, 1, uLegRRot, 0, 0);
+                    const kneeRY = 0.8 - Math.cos(uLegRRot)*0.4;
+                    const kneeRZ = Math.sin(uLegRRot)*0.4;
+                    setPartMatrix(lowerLegRMesh, 0.12, kneeRY - Math.cos(lLegRRot)*0.2, kneeRZ + Math.sin(lLegRRot)*0.2, 1, 1, 1, lLegRRot, 0, 0);
+                    setPartMatrix(footRightMesh, 0.12, kneeRY - Math.cos(lLegRRot)*0.4, kneeRZ + Math.sin(lLegRRot)*0.4 + 0.05, 1, 1, 1, lLegRRot, 0, 0);
+
+                    // Left Arm Articulation
+                    const uArmLRot = walkAngle;
+                    const lArmLRot = uArmLRot + elbowBend;
+                    setPartMatrix(upperArmLMesh, -0.32, 1.45 - Math.cos(uArmLRot)*0.175, Math.sin(uArmLRot)*0.175, 1, 1, 1, uArmLRot, 0, 0.15 + sway);
+                    const elbowLY = 1.45 - Math.cos(uArmLRot)*0.35;
+                    const elbowLZ = Math.sin(uArmLRot)*0.35;
+                    setPartMatrix(lowerArmLMesh, -0.32, elbowLY - Math.cos(lArmLRot)*0.175, elbowLZ + Math.sin(lArmLRot)*0.175, 1, 1, 1, lArmLRot, 0, 0.15 + sway);
+
+                    // Right Arm Articulation
+                    const uArmRRot = -walkAngle;
+                    const lArmRRot = uArmRRot + elbowBend;
+                    setPartMatrix(upperArmRMesh, 0.32, 1.45 - Math.cos(uArmRRot)*0.175, Math.sin(uArmRRot)*0.175, 1, 1, 1, uArmRRot, 0, -0.15 + sway);
+                    const elbowRY = 1.45 - Math.cos(uArmRRot)*0.35;
+                    const elbowRZ = Math.sin(uArmRRot)*0.35;
+                    setPartMatrix(lowerArmRMesh, 0.32, elbowRY - Math.cos(lArmRRot)*0.175, elbowRZ + Math.sin(lArmRRot)*0.175, 1, 1, 1, lArmRRot, 0, -0.15 + sway);
+
                     setPartMatrix(hairMesh, 0, 1.7, 0, 1, 1, 1, sway * 0.5, sway, 0);
                     setPartMatrix(eyeLeftMesh, -0.07, 1.65, 0.15, 1, 1, 1, sway * 0.5, sway, 0);
                     setPartMatrix(eyeRightMesh, 0.07, 1.65, 0.15, 1, 1, 1, sway * 0.5, sway, 0);
